@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+	],
+	"settings": {
+		"go.buildOnSave": "package",
+		"go.coverageDecorator": {
+			"type": "highlight",
+			"coveredHighlightColor": "rgba(0,64,0,0.05)",
+			"uncoveredHighlightColor": "rgba(128,0,0,0.05)",
+			"coveredGutterStyle": "blockblue",
+			"uncoveredGutterStyle": "slashyellow"
+		},
+		"go.lintTool": "golangci-lint"
+	}
+}

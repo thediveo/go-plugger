@@ -1,0 +1,58 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build workspace",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "type": "shell",
+            "command": "go build ./... && go build -tags dynamicplugintesting -buildmode=plugin -o internal/dynamicplugintesting/dynfoo/dynfooplug.so internal/dynamicplugintesting/dynfoo/dynfooplug.go && echo 'Done'",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": "$go"
+        },
+        {
+            "label": "Run all tests with coverage",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "type": "shell",
+            "command": "go test -v -timeout 30s . -cover",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            },
+            "problemMatcher": "$go"
+        },
+        {
+            "label": "Extremist linting",
+            "group": "none",
+            "type": "shell",
+            "command": "../../../../bin/golint ./...",
+            "problemMatcher": "$go",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            }
+        }
+    ]
+}
