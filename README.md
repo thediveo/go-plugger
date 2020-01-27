@@ -35,7 +35,7 @@ more you'll benefit from the `go-plugger` package: you only need to import
 the plugin packages, and plugger will do the rest.
 
 For a more elaborate "example", please also look at `internal/staticplugin/`
-and `inernal/dynamicplugin/`.
+and `internal/dynamicplugin/` (these are the built-in test cases).
 
 ## Run Unit Tests
 
