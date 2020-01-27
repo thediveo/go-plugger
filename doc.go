@@ -12,7 +12,7 @@ different functionality from other plugin groups.
 
 The plugins in a group are ordered to support applications where the plugins
 need to be called in specific sequence. Plugin order defaults to
-lexicographical order, but can be selectively overriden by the plugins
+lexicographical order, but can be selectively overridden by the plugins
 themselves, demanding specific placement. This supports more sophisticated
 plugin schemes, where the plugins allow to modularize and sequence certain
 application functionality.

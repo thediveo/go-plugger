@@ -47,7 +47,7 @@ import plugger "github.com/thediveo/go-plugger"
 // plugin name is taken from this (plugin) package's directory name (not:
 // path). And the plugin group name is taken from the directory name where the
 // plugin directory (or directories) is/are in. These autodetected data can be
-// overriden by explicitly specifying them here in the PluginSpec given to the
+// overridden by explicitly specifying them here in the PluginSpec given to the
 // call of RegisterPlugin.
 func init() {
 	plugger.RegisterPlugin(&plugger.PluginSpec{

@@ -190,7 +190,7 @@ func (pg *PluginGroup) Func(name string) []Symbol {
 
 // PluginsFunc returns a slice with the interface{}s of a specifically named
 // exported plugin function, together with the plugins exporting them. This
-// information can be useful for logging in applicatins which specific plugins
+// information can be useful for logging in applications which specific plugins
 // actually get invoked for a certain function.
 func (pg *PluginGroup) PluginsFunc(name string) []PluginFunc {
 	pf := make([]PluginFunc, 0, len(pg.plugins))
@@ -265,7 +265,7 @@ func (pg *PluginGroup) sort() {
 				}
 			}
 		}
-		// I severly miss Python's and Javascript's simplistic way to move
+		// I severely miss Python's and Javascript's simplistic way to move
 		// elements within slices. Go is just ugly and terrible. Any of its
 		// claims to have been inspired by Python is like Steve Balmer
 		// claiming to be inspired by Unix...

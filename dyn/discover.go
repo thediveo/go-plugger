@@ -34,7 +34,7 @@ func Discover(path string, recursive bool) {
 
 //
 // This is an example of when to separate out an enclosed callback function in
-// order to allow testing it separatedly.
+// order to allow testing it separately.
 func walkedOnSomething(recursive bool, path string, info os.FileInfo, err error) error {
 	if info != nil {
 		if info.IsDir() {
