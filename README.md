@@ -40,7 +40,13 @@ and `inernal/dynamicplugin/`.
 ## Run Unit Tests
 
 - VisualStudio Code: please first build the workspace, before running
-  tests. 
+  tests.
+- from CLI:
+  ```bash
+  go build ./...
+  go build -tags dynamicplugintesting -buildmode=plugin -o internal/dynamicplugintesting/dynfoo/dynfooplug.so internal/dynamicplugintesting/dynfoo/dynfooplug.go
+  go test -v -timeout 30s . -cover
+  ```
 
 ## Copyright and License
 
