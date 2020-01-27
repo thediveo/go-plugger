@@ -3,5 +3,7 @@
     "files.exclude": {
         "**/.git": true,
         "**/*.so": true
-    }
+    },
+   "go.formatTool": "gofmt",
+   "go.formatFlags": ["-s"],
 }

@@ -32,9 +32,9 @@ var _ = Describe("sorts plugin", func() {
 	It("lexicographically", func() {
 		plugger := PluginGroup{
 			plugins: []*PluginSpec{
-				&PluginSpec{Name: "beta"},
-				&PluginSpec{Name: "gamma"},
-				&PluginSpec{Name: "alpha"},
+				{Name: "beta"},
+				{Name: "gamma"},
+				{Name: "alpha"},
 			},
 		}
 		plugger.sort()
@@ -44,9 +44,9 @@ var _ = Describe("sorts plugin", func() {
 	It("to front", func() {
 		plugger := PluginGroup{
 			plugins: []*PluginSpec{
-				&PluginSpec{Name: "beta"},
-				&PluginSpec{Name: "gamma", Placement: "<"},
-				&PluginSpec{Name: "alpha"},
+				{Name: "beta"},
+				{Name: "gamma", Placement: "<"},
+				{Name: "alpha"},
 			},
 		}
 		plugger.sort()
@@ -56,9 +56,9 @@ var _ = Describe("sorts plugin", func() {
 	It("already at front", func() {
 		plugger := PluginGroup{
 			plugins: []*PluginSpec{
-				&PluginSpec{Name: "alpha", Placement: "<"},
-				&PluginSpec{Name: "gamma"},
-				&PluginSpec{Name: "beta"},
+				{Name: "alpha", Placement: "<"},
+				{Name: "gamma"},
+				{Name: "beta"},
 			},
 		}
 		plugger.sort()
@@ -68,9 +68,9 @@ var _ = Describe("sorts plugin", func() {
 	It("to back", func() {
 		plugger := PluginGroup{
 			plugins: []*PluginSpec{
-				&PluginSpec{Name: "beta", Placement: ">"},
-				&PluginSpec{Name: "gamma"},
-				&PluginSpec{Name: "alpha"},
+				{Name: "beta", Placement: ">"},
+				{Name: "gamma"},
+				{Name: "alpha"},
 			},
 		}
 		plugger.sort()
@@ -80,9 +80,9 @@ var _ = Describe("sorts plugin", func() {
 	It("already at back", func() {
 		plugger := PluginGroup{
 			plugins: []*PluginSpec{
-				&PluginSpec{Name: "beta"},
-				&PluginSpec{Name: "alpha"},
-				&PluginSpec{Name: "gamma", Placement: ">"},
+				{Name: "beta"},
+				{Name: "alpha"},
+				{Name: "gamma", Placement: ">"},
 			},
 		}
 		plugger.sort()
@@ -92,9 +92,9 @@ var _ = Describe("sorts plugin", func() {
 	It("before another named plugin", func() {
 		plugger := PluginGroup{
 			plugins: []*PluginSpec{
-				&PluginSpec{Name: "beta"},
-				&PluginSpec{Name: "gamma"},
-				&PluginSpec{Name: "alpha", Placement: "<gamma"},
+				{Name: "beta"},
+				{Name: "gamma"},
+				{Name: "alpha", Placement: "<gamma"},
 			},
 		}
 		plugger.sort()
@@ -104,9 +104,9 @@ var _ = Describe("sorts plugin", func() {
 	It("before itself", func() {
 		plugger := PluginGroup{
 			plugins: []*PluginSpec{
-				&PluginSpec{Name: "beta", Placement: "<beta"},
-				&PluginSpec{Name: "gamma"},
-				&PluginSpec{Name: "alpha"},
+				{Name: "beta", Placement: "<beta"},
+				{Name: "gamma"},
+				{Name: "alpha"},
 			},
 		}
 		plugger.sort()
@@ -116,9 +116,9 @@ var _ = Describe("sorts plugin", func() {
 	It("before another named plugin at begin", func() {
 		plugger := PluginGroup{
 			plugins: []*PluginSpec{
-				&PluginSpec{Name: "beta"},
-				&PluginSpec{Name: "gamma"},
-				&PluginSpec{Name: "alpha", Placement: "<beta"},
+				{Name: "beta"},
+				{Name: "gamma"},
+				{Name: "alpha", Placement: "<beta"},
 			},
 		}
 		plugger.sort()
@@ -128,9 +128,9 @@ var _ = Describe("sorts plugin", func() {
 	It("after another named plugin", func() {
 		plugger := PluginGroup{
 			plugins: []*PluginSpec{
-				&PluginSpec{Name: "beta"},
-				&PluginSpec{Name: "gamma"},
-				&PluginSpec{Name: "alpha", Placement: ">beta"},
+				{Name: "beta"},
+				{Name: "gamma"},
+				{Name: "alpha", Placement: ">beta"},
 			},
 		}
 		plugger.sort()
@@ -140,9 +140,9 @@ var _ = Describe("sorts plugin", func() {
 	It("after another named plugin at end", func() {
 		plugger := PluginGroup{
 			plugins: []*PluginSpec{
-				&PluginSpec{Name: "beta"},
-				&PluginSpec{Name: "gamma"},
-				&PluginSpec{Name: "alpha", Placement: ">gamma"},
+				{Name: "beta"},
+				{Name: "gamma"},
+				{Name: "alpha", Placement: ">gamma"},
 			},
 		}
 		plugger.sort()
@@ -152,9 +152,9 @@ var _ = Describe("sorts plugin", func() {
 	It("ignores unknown placement", func() {
 		plugger := PluginGroup{
 			plugins: []*PluginSpec{
-				&PluginSpec{Name: "beta", Placement: ">coma"},
-				&PluginSpec{Name: "gamma"},
-				&PluginSpec{Name: "alpha"},
+				{Name: "beta", Placement: ">coma"},
+				{Name: "gamma"},
+				{Name: "alpha"},
 			},
 		}
 		plugger.sort()
