@@ -15,6 +15,8 @@
 package plugger_test
 
 import (
+	"reflect"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
@@ -78,6 +80,18 @@ var _ = Describe("static plugins", func() {
 		Expect(plugfuncs[0].Plugin.Name).To(Equal("fooplug"))
 		Expect(plugfuncs[1].Plugin.Name).To(Equal("barplug"))
 		Expect(plugfuncs[2].Plugin.Name).To(Equal("zoo"))
+	})
+
+	It("locates an exported named function in a specific plugin", func() {
+		p := plugger.New("staticplugintesting")
+
+		Expect(p.PluginFunc("noneplug", "PlugFunc")).To(BeNil())
+		Expect(p.PluginFunc("zoo", "NonSuchFunction")).To(BeNil())
+
+		zooplugfunc := p.PluginFunc("zoo", "PlugFunc")
+		Expect(zooplugfunc).NotTo(BeNil())
+		Expect(reflect.ValueOf(zooplugfunc).Pointer()).To(
+			Equal(reflect.ValueOf(zooplug.PlugFunc).Pointer()))
 	})
 
 	It("returns fake plugger for unknown group", func() {

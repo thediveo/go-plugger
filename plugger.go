@@ -207,6 +207,21 @@ func (pg *PluginGroup) PluginsFunc(name string) []PluginFunc {
 	return pf
 }
 
+// PluginFunc returns the interface{} to the named exported plugin function in
+// the named plugin.
+func (pg *PluginGroup) PluginFunc(plugin string, name string) Symbol {
+	for _, plug := range pg.plugins {
+		if plug.Name == plugin {
+			f, ok := plug.symbolmap[name]
+			if ok && reflect.TypeOf(f).Kind() == reflect.Func {
+				return f
+			}
+			return nil
+		}
+	}
+	return nil
+}
+
 // Plugins returns the list of plugin specifications in this group. For
 // instance, this can be used to log the actual set of plugins found or
 // available.
