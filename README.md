@@ -41,12 +41,9 @@ and `internal/dynamicplugin/` (these are the built-in test cases).
 
 - VisualStudio Code: please first build the workspace, before running
   tests.
-- from CLI:
-  ```bash
-  go build ./...
-  go build -tags dynamicplugintesting -buildmode=plugin -o internal/dynamicplugintesting/dynfoo/dynfooplug.so internal/dynamicplugintesting/dynfoo/dynfooplug.go
-  go test -v -timeout 30s . -cover
-  ```
+
+- from CLI: simply run the `./alltests` script; it will build the shared
+  library for the test shared library plugin.
 
 ## Copyright and License
 
