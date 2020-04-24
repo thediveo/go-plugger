@@ -188,6 +188,21 @@ func (pg *PluginGroup) Func(name string) []Symbol {
 	return fs
 }
 
+// FuncPrefix returns a slice of interface{}s for all plugins in a group
+// providing functions which start with "prefix"-
+func (pg *PluginGroup) FuncPrefix(prefix string) []Symbol {
+	fs := make([]Symbol, 0, len(pg.plugins))
+	for _, plug := range pg.plugins {
+		// Only add those exported symbols that are actually functions.
+		for name, f := range plug.symbolmap {
+			if strings.HasPrefix(name, prefix) && reflect.TypeOf(f).Kind() == reflect.Func {
+				fs = append(fs, f)
+			}
+		}
+	}
+	return fs
+}
+
 // PluginsFunc returns a slice with the interface{}s of a specifically named
 // exported plugin function, together with the plugins exporting them. This
 // information can be useful for logging in applications which specific plugins

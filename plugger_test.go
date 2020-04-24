@@ -15,6 +15,11 @@
 package plugger
 
 import (
+	"path/filepath"
+	"reflect"
+	"runtime"
+	"strings"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -81,4 +86,39 @@ var _ = Describe("plugin registering", func() {
 		Expect(p.plugins[0].Name).To(Equal("foo"))
 	})
 
+	It("finds prefixed functions", func() {
+		Expect(func() {
+			RegisterPlugin(&PluginSpec{
+				Group:   "group",
+				Name:    "plug1",
+				Symbols: []Symbol{PrefixFoo},
+			})
+			RegisterPlugin(&PluginSpec{
+				Group:   "group",
+				Name:    "plug2",
+				Symbols: []Symbol{PrefixBar},
+			})
+			RegisterPlugin(&PluginSpec{
+				Group:   "group",
+				Name:    "plug3",
+				Symbols: []Symbol{Foo},
+			})
+		}).ToNot(Panic())
+		p := New("group")
+		Expect(p.plugins).To(HaveLen(3))
+		pf := p.FuncPrefix("Prefix")
+		Expect(pf).To(HaveLen(2))
+		// Doesn't work: Expect(pf).To(ContainElement(Symbol(PrefixFoo)))
+		pfn := make([]string, len(pf))
+		for idx, f := range pf {
+			pfn[idx] = strings.SplitN(filepath.Base(runtime.FuncForPC(
+				reflect.ValueOf(f).Pointer()).Name()), ".", 2)[1]
+		}
+		Expect(pfn).To(ConsistOf("PrefixFoo", "PrefixBar"))
+	})
+
 })
+
+func Foo()       {}
+func PrefixFoo() {}
+func PrefixBar() {}
