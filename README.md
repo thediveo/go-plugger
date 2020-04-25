@@ -42,7 +42,7 @@ and `internal/dynamicplugin/` (these are the built-in test cases).
 - VisualStudio Code: please first build the workspace, before running
   tests.
 
-- from CLI: simply run the `./alltests` script; it will build the shared
+- from CLI: simply run the `./testall.sh` script; it will build the shared
   library for the test shared library plugin.
 
 ## Copyright and License

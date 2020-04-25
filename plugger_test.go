@@ -86,6 +86,69 @@ var _ = Describe("plugin registering", func() {
 		Expect(p.plugins[0].Name).To(Equal("foo"))
 	})
 
+	It("ignores non-function symbols", func() {
+		Expect(func() {
+			RegisterPlugin(&PluginSpec{
+				Group:   "group",
+				Name:    "plug1",
+				Symbols: []Symbol{42},
+			})
+		}).ToNot(Panic())
+		Expect(New("group").Plugins()[0].symbolmap).To(BeEmpty())
+	})
+
+	It("ignores unnamed function symbols", func() {
+		Expect(func() {
+			RegisterPlugin(&PluginSpec{
+				Group:   "group",
+				Name:    "plug1",
+				Symbols: []Symbol{NamedSymbol{Symbol: PrefixFoo}},
+			})
+		}).ToNot(Panic())
+		Expect(New("group").Func("foo")).To(BeEmpty())
+	})
+
+	It("registers named function symbols", func() {
+		Expect(func() {
+			RegisterPlugin(&PluginSpec{
+				Group:   "group",
+				Name:    "plug1",
+				Symbols: []Symbol{NamedSymbol{"Foo", PrefixFoo}},
+			})
+			RegisterPlugin(&PluginSpec{
+				Group:   "group",
+				Name:    "plug2",
+				Symbols: []Symbol{NamedSymbol{"Foo", PrefixBar}},
+			})
+		}).ToNot(Panic())
+		p := New("group")
+		Expect(p.plugins).To(HaveLen(2))
+		Expect(p.Func("Foo")).To(HaveLen(2))
+	})
+
+	It("panics on duplicate function symbols", func() {
+		Expect(func() {
+			RegisterPlugin(&PluginSpec{
+				Group: "group",
+				Name:  "plug1",
+				Symbols: []Symbol{
+					NamedSymbol{"Foo", PrefixFoo},
+					NamedSymbol{"Foo", PrefixFoo},
+				},
+			})
+		}).To(Panic())
+		Expect(func() {
+			RegisterPlugin(&PluginSpec{
+				Group: "group",
+				Name:  "plug1",
+				Symbols: []Symbol{
+					PrefixFoo,
+					PrefixFoo,
+				},
+			})
+		}).To(Panic())
+	})
+
 	It("finds prefixed functions", func() {
 		Expect(func() {
 			RegisterPlugin(&PluginSpec{
