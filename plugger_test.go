@@ -180,8 +180,52 @@ var _ = Describe("plugin registering", func() {
 		Expect(pfn).To(ConsistOf("PrefixFoo", "PrefixBar"))
 	})
 
+	It("handles pointers instead of functions", func() {
+		Expect(func() {
+			RegisterPlugin(&PluginSpec{
+				Group:   "group",
+				Name:    "plug1",
+				Symbols: []Symbol{Ioo(&Loo{})},
+			})
+		}).ToNot(Panic())
+		p := New("group")
+		Expect(p.plugins).To(HaveLen(1))
+		pi := p.PluginsFunc("Loo")
+		Expect(pi).To(HaveLen(1))
+		Expect(pi[0].F).To(BeAssignableToTypeOf(Ioo(&Loo{})))
+		Expect(pi[0].F.(Ioo).Goo()).To(Equal(42))
+	})
+
+	It("handles interfaces instead of functions", func() {
+		Expect(func() {
+			RegisterPlugin(&PluginSpec{
+				Group: "group",
+				Name:  "plug1",
+				Symbols: []Symbol{
+					NamedSymbol{
+						Name:   "Ioo",
+						Symbol: Ioo(&Loo{}),
+					}},
+			})
+		}).ToNot(Panic())
+		p := New("group")
+		Expect(p.plugins).To(HaveLen(1))
+		pi := p.PluginsFunc("Ioo")
+		Expect(pi).To(HaveLen(1))
+		Expect(pi[0].F).To(BeAssignableToTypeOf(Ioo(&Loo{})))
+		Expect(pi[0].F.(Ioo).Goo()).To(Equal(42))
+	})
+
 })
 
 func Foo()       {}
 func PrefixFoo() {}
 func PrefixBar() {}
+
+type Ioo interface {
+	Goo() int
+}
+
+type Loo struct{}
+
+func (l *Loo) Goo() int { return 42 }

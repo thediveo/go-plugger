@@ -147,7 +147,13 @@ func registerPlugin(plugspec *PluginSpec,
 	pspec.symbolmap = map[string]Symbol{}
 	for _, symbol := range pspec.Symbols {
 		if namedsym, ok := symbol.(NamedSymbol); ok {
-			if namedsym.Name == "" || reflect.TypeOf(namedsym.Symbol).Kind() != reflect.Func {
+			if namedsym.Name == "" {
+				continue
+			}
+			switch reflect.TypeOf(namedsym.Symbol).Kind() {
+			case reflect.Func, reflect.Ptr:
+				break
+			default:
 				continue
 			}
 			if _, ok = pspec.symbolmap[namedsym.Name]; ok {
@@ -156,16 +162,22 @@ func registerPlugin(plugspec *PluginSpec,
 			}
 			pspec.symbolmap[namedsym.Name] = namedsym.Symbol
 		} else {
-			if reflect.TypeOf(symbol).Kind() != reflect.Func {
+			var symname string
+			t := reflect.TypeOf(symbol)
+			switch t.Kind() {
+			case reflect.Func:
+				symname = strings.SplitN(filepath.Base(runtime.FuncForPC(
+					reflect.ValueOf(symbol).Pointer()).Name()), ".", 2)[1]
+			case reflect.Ptr:
+				symname = t.Elem().Name()
+			default:
 				continue
 			}
-			fname := strings.SplitN(filepath.Base(runtime.FuncForPC(
-				reflect.ValueOf(symbol).Pointer()).Name()), ".", 2)[1]
-			if _, ok = pspec.symbolmap[fname]; ok {
+			if _, ok = pspec.symbolmap[symname]; ok {
 				panic(fmt.Sprintf("plugin %q in group %q: duplicate symbol %q",
-					pspec.Name, pspec.Group, fname))
+					pspec.Name, pspec.Group, symname))
 			}
-			pspec.symbolmap[fname] = symbol
+			pspec.symbolmap[symname] = symbol
 		}
 	}
 	// Let's find the plugin's group, or if there isn't one, create a new one
@@ -235,7 +247,11 @@ func (pg *PluginGroup) PluginsFunc(name string) []PluginFunc {
 	pf := make([]PluginFunc, 0, len(pg.plugins))
 	for _, plug := range pg.plugins {
 		f, ok := plug.symbolmap[name]
-		if ok && reflect.TypeOf(f).Kind() == reflect.Func {
+		if !ok {
+			continue
+		}
+		switch reflect.TypeOf(f).Kind() {
+		case reflect.Func, reflect.Ptr:
 			pf = append(pf, PluginFunc{
 				F:      f,
 				Name:   name,
