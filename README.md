@@ -103,9 +103,9 @@ for _, i := range plugs.Func("I") {
   tests.
 
 - from CLI: simply run the `./testall.sh` script; it will build the shared
-  library for the test shared library plugin.
+  library for the test shared library plugin(s).
 
 ## Copyright and License
 
-`plugger` is Copyright 2019 Harald Albrecht, and licensed under the Apache
+`plugger` is Copyright 2019-2021 Harald Albrecht, and licensed under the Apache
 License, Version 2.0.
