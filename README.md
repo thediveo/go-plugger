@@ -1,13 +1,15 @@
 # plugger
 
-[![GoDoc](https://godoc.org/github.com/TheDiveO/go-plugger?status.svg)](http://godoc.org/github.com/TheDiveO/go-plugger)
+[![Go Reference](https://pkg.go.dev/badge/github.com/thediveo/go-plugger.svg)](https://pkg.go.dev/github.com/thediveo/go-plugger)
 ![GitHub](https://img.shields.io/github/license/thediveo/go-asciitree)
 [![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/go-plugger)](https://goreportcard.com/report/github.com/thediveo/go-plugger)
 
 `plugger` is a simplistic plugin manager that works with both statically linked
 as well as dynamically linked Go plugins. It supports multiple plugin groups, as
 well as controlled plugin order within a group. Plugins then register named
-functions or named interfaces belonging to specific groups.
+functions or named interfaces belonging to specific groups. Other application
+code finally queries the registered functions and interfaces, and then calls
+them as needed.
 
 ## Examples
 
@@ -42,6 +44,12 @@ the plugin packages, and plugger will do the rest.
 
 For a more elaborate "example", please also look at `internal/staticplugin/`
 and `internal/dynamicplugin/` (these are the built-in test cases).
+
+Please note that in order to use dynamically loaded plugins, the build tag
+`plugger_dynamic` needs to be set. The `plugger` module now defaults to **not
+including** support for dynamically loading plugins, unless explicitly requested
+by the `plugger_dynamic` build tag. The default avoids linker warnings when
+building fully static binaries without any dynamic C library references.
 
 ### Registering and Calling Interfaces
 

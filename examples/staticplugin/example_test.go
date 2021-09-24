@@ -1,4 +1,4 @@
-// Copyright 2019 Harald Albrecht.
+// Copyright 2021 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package plugger_test
+package staticplugin
 
 import (
 	"fmt"
@@ -24,8 +24,7 @@ import (
 func Example() {
 	plugs := plugger.New("plugins")
 	for _, doit := range plugs.Func("DoIt") {
-		fmt.Printf("DoIt() returns %q\n", doit.(func() string)())
+		fmt.Println(doit.(func() string)())
 	}
-	// Output:
-	// DoIt() returns "foo static plugin"
+	// Output: foo static plugin
 }

@@ -10,7 +10,7 @@
                 "isDefault": true
             },
             "type": "shell",
-            "command": "go build ./... && go build -tags dynamicplugintesting -buildmode=plugin -o internal/dynamicplugintesting/dynfoo/dynfooplug.so internal/dynamicplugintesting/dynfoo/dynfooplug.go && echo 'Done'",
+            "command": "go build -tags plugger_dynamic ./... && go build -tags plugger_dynamic,dynamicplugintesting -buildmode=plugin -o internal/dynamicplugintesting/dynfoo/dynfooplug.so internal/dynamicplugintesting/dynfoo/dynfooplug.go && echo 'Done'",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
@@ -28,7 +28,7 @@
                 "isDefault": true
             },
             "type": "shell",
-            "command": "go test -v -timeout 30s . -cover",
+            "command": "go test -v -timeout 30s ./... -cover",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
@@ -38,21 +38,6 @@
                 "clear": true
             },
             "problemMatcher": "$go"
-        },
-        {
-            "label": "Extremist linting",
-            "group": "none",
-            "type": "shell",
-            "command": "../../../../bin/golint ./...",
-            "problemMatcher": "$go",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": true
-            }
         }
     ]
 }

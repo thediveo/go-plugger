@@ -1,3 +1,6 @@
+//go:build plugger_dynamic
+// +build plugger_dynamic
+
 // Copyright 2019 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,5 +26,5 @@ import (
 
 func TestPluggerDyn(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "plugger suite")
+	RunSpecs(t, "plugger/dyn suite")
 }

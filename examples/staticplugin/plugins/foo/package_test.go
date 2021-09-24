@@ -1,4 +1,4 @@
-// Copyright 2019 Harald Albrecht.
+// Copyright 2021 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package plugger_test
+package foo
 
 import (
-	"fmt"
+	"testing"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	plugger "github.com/thediveo/go-plugger"
-	_ "github.com/thediveo/go-plugger/examples/staticplugin/plugins/foo"
 )
 
-func Example() {
-	plugs := plugger.New("plugins")
-	for _, doit := range plugs.Func("DoIt") {
-		fmt.Printf("DoIt() returns %q\n", doit.(func() string)())
-	}
-	// Output:
-	// DoIt() returns "foo static plugin"
+func TestFooPlugin(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "plugger/examples/staticplugin/plugins/foo suite")
 }
+
+var _ = Describe("static plugin", func() {
+
+	It("registers its plugin function", func() {
+		Expect(plugger.New("plugins").Func("DoIt")).To(HaveLen(1))
+	})
+
+	It("successfully calls a registered plugin function", func() {
+		Expect(plugger.New("plugins").Func("DoIt")[0].(func() string)()).To(Equal("foo static plugin"))
+	})
+
+})
