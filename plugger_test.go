@@ -226,6 +226,44 @@ var _ = Describe("plugin registering", func() {
 		Expect(pi[0].F.(Ioo).Goo()).To(Equal(42))
 	})
 
+	It("correctly places plugins", func() {
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-a",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-x",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-y",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group:     "group",
+			Name:      "plug-b",
+			Placement: ">plug-x",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		names := []string{}
+		pg := New("group")
+		for _, plug := range pg.Plugins() {
+			names = append(names, plug.Name)
+		}
+		Expect(names).To(Equal([]string{"plug-a", "plug-x", "plug-b", "plug-y"}))
+	})
+
 })
 
 func Foo()       {}

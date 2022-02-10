@@ -309,7 +309,17 @@ func (pg *PluginGroup) sort() {
 	// Or, at least try to do so...
 	plugs := make([]*PluginSpec, len(pg.plugins))
 	copy(plugs, pg.plugins)
-	for idx, plug := range pg.plugins {
+	for _, plug := range pg.plugins {
+		// Find the next plugin to process from the original list on in the
+		// current and potentially modified list, because we need to work on the
+		// current list when shuffling plugins around.
+		var idx int
+		var pl *PluginSpec
+		for idx, pl = range plugs {
+			if pl.Name == plug.Name {
+				break
+			}
+		}
 		pos := idx // start with no change in a plugin's sequence position
 		// Does the plugin want to be positioned either before a specifically
 		// named other plugin or at the beginning?
