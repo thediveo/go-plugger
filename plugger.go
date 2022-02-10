@@ -86,6 +86,12 @@ var pluginGroups = map[string]*PluginGroup{}
 // of whether they are statically linked or dynamically loaded shared library
 // plugins.
 //
+// Note: the same plugin name within a group can be registered only once. Any
+// attempt to register the same plugin name twice in the same group will result
+// in a panic. This avoids hard-to-diagnose errors which would otherwise
+// silently creep in as soon as using placements relative to double-registered
+// names.
+//
 // Besides the exported plugin functions, a plugin might also specify its
 // placement within its plugin group: at the beginning, end, or before/after
 // another (named) plugin within the same group.
@@ -187,8 +193,14 @@ func registerPlugin(plugspec *PluginSpec,
 		pg = &PluginGroup{Group: pspec.Group}
 		pluginGroups[pspec.Group] = pg
 	}
-	// Just tack on this plugin to the list of registered plugins in this
-	// group. Sorting has to wait for later...
+	// Just tack on this plugin to the list of registered plugins in this group.
+	// Sorting has to wait for later... Make sure that the same plugin name
+	// cannot be registered twice within the same plugin group.
+	for _, plug := range pg.plugins {
+		if pspec.Name == plug.Name {
+			panic(fmt.Sprintf("duplicate plugin name registration '%s'", pspec.Name))
+		}
+	}
 	pg.unsorted = true
 	pg.plugins = append(pg.plugins, &pspec)
 }

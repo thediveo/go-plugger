@@ -81,9 +81,19 @@ var _ = Describe("plugin registering", func() {
 					return uintptr(0), "plugins/foo/plug.go", 0, true
 				})
 		}).ToNot(Panic())
+		Expect(func() {
+			registerPlugin(&PluginSpec{},
+				func(int) (uintptr, string, int, bool) {
+					return uintptr(0), "plugins/foo/plug.go", 0, true
+				})
+		}).To(Panic())
 		p := New("plugins")
 		Expect(p.plugins).To(HaveLen(1))
 		Expect(p.plugins[0].Name).To(Equal("foo"))
+	})
+
+	It("panics when registering the same plugin name twice", func() {
+
 	})
 
 	It("ignores non-function symbols", func() {
