@@ -226,6 +226,110 @@ var _ = Describe("plugin registering", func() {
 		Expect(pi[0].F.(Ioo).Goo()).To(Equal(42))
 	})
 
+	It("places plugin before another plugin", func() {
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-a",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-b",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group:     "group",
+			Name:      "plug-c",
+			Placement: "<plug-b",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		Expect(New("group").PluginNames()).To(Equal([]string{"plug-a", "plug-c", "plug-b"}))
+	})
+
+	It("places plugin at the beginning", func() {
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-a",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-b",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group:     "group",
+			Name:      "plug-c",
+			Placement: "<",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		Expect(New("group").PluginNames()).To(Equal([]string{"plug-c", "plug-a", "plug-b"}))
+	})
+
+	It("places plugin after another plugin", func() {
+		RegisterPlugin(&PluginSpec{
+			Group:     "group",
+			Name:      "plug-a",
+			Placement: ">plug-b",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-b",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-c",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		Expect(New("group").PluginNames()).To(Equal([]string{"plug-b", "plug-a", "plug-c"}))
+	})
+
+	It("places plugin at the end", func() {
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-a",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group:     "group",
+			Name:      "plug-b",
+			Placement: ">",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-c",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		Expect(New("group").PluginNames()).To(Equal([]string{"plug-a", "plug-c", "plug-b"}))
+	})
+
 	It("correctly places plugins", func() {
 		RegisterPlugin(&PluginSpec{
 			Group: "group",
@@ -256,12 +360,7 @@ var _ = Describe("plugin registering", func() {
 				NamedSymbol{"Foo", PrefixFoo},
 			},
 		})
-		names := []string{}
-		pg := New("group")
-		for _, plug := range pg.Plugins() {
-			names = append(names, plug.Name)
-		}
-		Expect(names).To(Equal([]string{"plug-a", "plug-x", "plug-b", "plug-y"}))
+		Expect(New("group").PluginNames()).To(Equal([]string{"plug-a", "plug-x", "plug-b", "plug-y"}))
 	})
 
 })

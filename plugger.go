@@ -296,6 +296,16 @@ func (pg *PluginGroup) Plugins() []*PluginSpec {
 	return pg.plugins
 }
 
+// PluginNames returns the list of plugin names in this group. This is mostly a
+// convenience function for logging, unit testing, et cetera.
+func (pg *PluginGroup) PluginNames() []string {
+	names := make([]string, 0, len(pg.plugins))
+	for _, plugin := range pg.plugins {
+		names = append(names, plugin.Name)
+	}
+	return names
+}
+
 // Sorts the plugins by name and optionally by reference; that is, individual
 // plugins can claim to get to the front/end, or before/after a another named
 // plugin. This is with a nod to Jeremy Ruston and his incredible TiddlyWiki
