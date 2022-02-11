@@ -92,9 +92,14 @@ var pluginGroups = map[string]*PluginGroup{}
 // silently creep in as soon as using placements relative to double-registered
 // names.
 //
-// Besides the exported plugin functions, a plugin might also specify its
+// In addition to its exported plugin functions, a plugin might also specify its
 // placement within its plugin group: at the beginning, end, or before/after
 // another (named) plugin within the same group.
+//
+//   - Placement: "<" ... at beginning of plugin list
+//   - Placement: "<foo" ... just before plugin "foo"
+//   - Placement: ">" ... at end of plugin list
+//   - Placement: ">foo" ... directly after plugin "foo"
 //
 // For convenience, the plugin name and/or group might be left unspecified
 // (zeroed): in this case, RegisterPlugin tries to discover them automatically
