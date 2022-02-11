@@ -11,7 +11,7 @@ Please note that in our example we don't explicitly specify a plugin group when
 registering: plugger then automatically derives the plugin group from the name
 of the parent(!) directory where the plugin package is located. For instance,
 any plugin functions from "examples/static/plugin/plugins/foo" will be
-registered with the plugin group "plugins", unless explicitly overriden.
+registered with the plugin group "plugins", unless explicitly overridden.
 
 Second, import your static plugins to ensure they are included in your build, so
 they automatically register at startup. Importing plugins using the "_" blank

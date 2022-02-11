@@ -20,7 +20,7 @@ import (
 	"runtime"
 	"strings"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
@@ -81,9 +81,19 @@ var _ = Describe("plugin registering", func() {
 					return uintptr(0), "plugins/foo/plug.go", 0, true
 				})
 		}).ToNot(Panic())
+		Expect(func() {
+			registerPlugin(&PluginSpec{},
+				func(int) (uintptr, string, int, bool) {
+					return uintptr(0), "plugins/foo/plug.go", 0, true
+				})
+		}).To(Panic())
 		p := New("plugins")
 		Expect(p.plugins).To(HaveLen(1))
 		Expect(p.plugins[0].Name).To(Equal("foo"))
+	})
+
+	It("panics when registering the same plugin name twice", func() {
+
 	})
 
 	It("ignores non-function symbols", func() {
@@ -214,6 +224,143 @@ var _ = Describe("plugin registering", func() {
 		Expect(pi).To(HaveLen(1))
 		Expect(pi[0].F).To(BeAssignableToTypeOf(Ioo(&Loo{})))
 		Expect(pi[0].F.(Ioo).Goo()).To(Equal(42))
+	})
+
+	It("places plugin before another plugin", func() {
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-a",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-b",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group:     "group",
+			Name:      "plug-c",
+			Placement: "<plug-b",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		Expect(New("group").PluginNames()).To(Equal([]string{"plug-a", "plug-c", "plug-b"}))
+	})
+
+	It("places plugin at the beginning", func() {
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-a",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-b",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group:     "group",
+			Name:      "plug-c",
+			Placement: "<",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		Expect(New("group").PluginNames()).To(Equal([]string{"plug-c", "plug-a", "plug-b"}))
+	})
+
+	It("places plugin after another plugin", func() {
+		RegisterPlugin(&PluginSpec{
+			Group:     "group",
+			Name:      "plug-a",
+			Placement: ">plug-b",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-b",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-c",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		Expect(New("group").PluginNames()).To(Equal([]string{"plug-b", "plug-a", "plug-c"}))
+	})
+
+	It("places plugin at the end", func() {
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-a",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group:     "group",
+			Name:      "plug-b",
+			Placement: ">",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-c",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		Expect(New("group").PluginNames()).To(Equal([]string{"plug-a", "plug-c", "plug-b"}))
+	})
+
+	It("correctly places plugins", func() {
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-a",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-x",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group: "group",
+			Name:  "plug-y",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		RegisterPlugin(&PluginSpec{
+			Group:     "group",
+			Name:      "plug-b",
+			Placement: ">plug-x",
+			Symbols: []Symbol{
+				NamedSymbol{"Foo", PrefixFoo},
+			},
+		})
+		Expect(New("group").PluginNames()).To(Equal([]string{"plug-a", "plug-x", "plug-b", "plug-y"}))
 	})
 
 })

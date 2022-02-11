@@ -86,9 +86,20 @@ var pluginGroups = map[string]*PluginGroup{}
 // of whether they are statically linked or dynamically loaded shared library
 // plugins.
 //
-// Besides the exported plugin functions, a plugin might also specify its
+// Note: the same plugin name within a group can be registered only once. Any
+// attempt to register the same plugin name twice in the same group will result
+// in a panic. This avoids hard-to-diagnose errors which would otherwise
+// silently creep in as soon as using placements relative to double-registered
+// names.
+//
+// In addition to its exported plugin functions, a plugin might also specify its
 // placement within its plugin group: at the beginning, end, or before/after
 // another (named) plugin within the same group.
+//
+//   - Placement: "<" ... at beginning of plugin list
+//   - Placement: "<foo" ... just before plugin "foo"
+//   - Placement: ">" ... at end of plugin list
+//   - Placement: ">foo" ... directly after plugin "foo"
 //
 // For convenience, the plugin name and/or group might be left unspecified
 // (zeroed): in this case, RegisterPlugin tries to discover them automatically
@@ -187,8 +198,14 @@ func registerPlugin(plugspec *PluginSpec,
 		pg = &PluginGroup{Group: pspec.Group}
 		pluginGroups[pspec.Group] = pg
 	}
-	// Just tack on this plugin to the list of registered plugins in this
-	// group. Sorting has to wait for later...
+	// Just tack on this plugin to the list of registered plugins in this group.
+	// Sorting has to wait for later... Make sure that the same plugin name
+	// cannot be registered twice within the same plugin group.
+	for _, plug := range pg.plugins {
+		if pspec.Name == plug.Name {
+			panic(fmt.Sprintf("duplicate plugin name registration '%s'", pspec.Name))
+		}
+	}
 	pg.unsorted = true
 	pg.plugins = append(pg.plugins, &pspec)
 }
@@ -284,6 +301,16 @@ func (pg *PluginGroup) Plugins() []*PluginSpec {
 	return pg.plugins
 }
 
+// PluginNames returns the list of plugin names in this group. This is mostly a
+// convenience function for logging, unit testing, et cetera.
+func (pg *PluginGroup) PluginNames() []string {
+	names := make([]string, 0, len(pg.plugins))
+	for _, plugin := range pg.plugins {
+		names = append(names, plugin.Name)
+	}
+	return names
+}
+
 // Sorts the plugins by name and optionally by reference; that is, individual
 // plugins can claim to get to the front/end, or before/after a another named
 // plugin. This is with a nod to Jeremy Ruston and his incredible TiddlyWiki
@@ -297,7 +324,17 @@ func (pg *PluginGroup) sort() {
 	// Or, at least try to do so...
 	plugs := make([]*PluginSpec, len(pg.plugins))
 	copy(plugs, pg.plugins)
-	for idx, plug := range pg.plugins {
+	for _, plug := range pg.plugins {
+		// Find the next plugin to process from the original list on in the
+		// current and potentially modified list, because we need to work on the
+		// current list when shuffling plugins around.
+		var idx int
+		var pl *PluginSpec
+		for idx, pl = range plugs {
+			if pl.Name == plug.Name {
+				break
+			}
+		}
 		pos := idx // start with no change in a plugin's sequence position
 		// Does the plugin want to be positioned either before a specifically
 		// named other plugin or at the beginning?
