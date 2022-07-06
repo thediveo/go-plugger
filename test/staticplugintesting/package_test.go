@@ -1,4 +1,4 @@
-// Copyright 2021 Harald Albrecht.
+// Copyright 2021, 2022 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,21 +17,22 @@ package staticplugintesting_test
 import (
 	"testing"
 
+	"github.com/thediveo/go-plugger/v2"
+	"github.com/thediveo/go-plugger/v2/test/staticplugintesting/barplug"
+	"github.com/thediveo/go-plugger/v2/test/staticplugintesting/fooplug"
+	"github.com/thediveo/go-plugger/v2/test/staticplugintesting/zooplug"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
-	plugger "github.com/thediveo/go-plugger"
-	"github.com/thediveo/go-plugger/internal/staticplugintesting/barplug"
-	"github.com/thediveo/go-plugger/internal/staticplugintesting/fooplug"
-	"github.com/thediveo/go-plugger/internal/staticplugintesting/zooplug"
 )
 
 func TestPlugins(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "plugger/internal/staticplugintesting suite")
+	RunSpecs(t, "plugger/test/staticplugintesting suite")
 }
 
-var _ = Describe("static testing plugins", func() {
+var _ = Describe("static plugins", func() {
 
 	It("register themselves", func() {
 		zooplug.DoRegister()

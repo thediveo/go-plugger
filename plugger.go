@@ -1,4 +1,4 @@
-// Copyright 2019 Harald Albrecht.
+// Copyright 2019, 2022 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,29 +20,36 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
-	"sort"
 	"strings"
 )
 
-// A Symbol is a pointer to an exported plugin function.
+// A Symbol is either an exported plugin function or an interface (more precise,
+// a pointer to a struct type). Everything else is considered by plugger to be
+// an invalid Symbol.
+//
+// Please that Go's runtime only stores a pointer's
 type Symbol interface{}
 
-// NamedSymbol is a Symbol where its name is explicitly specified, as opposed to
+// NamedSymbol is a [Symbol] with its name explicitly specified, as opposed to
 // automatically being derived from the function a Symbol points to.
 type NamedSymbol struct {
 	Name   string // Name of the Symbol (of the exported plugin function).
 	Symbol Symbol // exported plugin function.
 }
 
-// PluginSpec describes the registration data of a plugin. Most of its fields
-// can be left zeroed (https://golang.org/ref/spec#The_zero_value), with the
-// exception of the exported functions (symbols) list. This list of exported
-// functions must not be empty, otherwise the plugin registration will be
-// ignored.
+// PluginSpec describes the registration data of registered plugins returned by
+// [PluginGroup.Plugins] and indirectly by [PluginGroup.PluginsFunc]. The
+// plugger v2 now avoids registering plugins to have to deal with PluginSpec
+// directly, but instead offer a set of registration option functions, such as
+// [WithName], [WithGroup], [WithSymbol], et cetera.
+//
+// Most fields in a PluginSpec can be left zeroed
+// (https://golang.org/ref/spec#The_zero_value), with the exception of the
+// exported functions (symbols) list.
 //
 // If left zeroed (that is, unspecified), the plugin name and its group will be
 // deduced from the source code path of the plugin .go file that is calling the
-// RegisterPlugin function.
+// RegisterPlugin function and the PluginSpec updated accordingly.
 type PluginSpec struct {
 	// optional name. Will be discovered by RegisterPlugin if zero.
 	Name string
@@ -59,15 +66,6 @@ type PluginSpec struct {
 	symbolmap map[string]Symbol
 }
 
-// PluginGroup is a named group of plugins that lists those plugins registered
-// for this group in "sorted" order. Plugins that do not register any placement
-// demands are sorted in lexicographic order.
-type PluginGroup struct {
-	Group    string        // group of plugins this plugger manages.
-	unsorted bool          // has the list of registered plugins been sorted or is it dirty?
-	plugins  []*PluginSpec // sorted list of registered plugins (plugin specifications).
-}
-
 // PluginFunc is a particular exported named function in a specific plugin. This
 // information can be used for logging purposes in applications using plugins,
 // such as logging the exact plugin order in which a specific function is called
@@ -81,36 +79,47 @@ type PluginFunc struct {
 // The internal map of plugin groups being managed.
 var pluginGroups = map[string]*PluginGroup{}
 
-// RegisterPlugin registers a plugin by name and group with its exported plugin
-// functions. This registration function is to be called by plugins, regardless
-// of whether they are statically linked or dynamically loaded shared library
-// plugins.
+// Register registers a plugin by name and group, together with its exported
+// plugin functions. Usually, Register is directly called by plugins in their
+// init functions, regardless of whether they are statically linked or
+// dynamically loaded shared library plugins.
 //
-// Note: the same plugin name within a group can be registered only once. Any
-// attempt to register the same plugin name twice in the same group will result
-// in a panic. This avoids hard-to-diagnose errors which would otherwise
+// Note: a particular plugin name within a group can be registered only once.
+// Any attempt to register the same plugin name twice in the same group will
+// result in a panic. This avoids hard-to-diagnose errors which would otherwise
 // silently creep in as soon as using placements relative to double-registered
-// names.
+// names. Believe us, we've fallen into the ambigous name trap ourselves.
 //
-// In addition to its exported plugin functions, a plugin might also specify its
-// placement within its plugin group: at the beginning, end, or before/after
-// another (named) plugin within the same group.
+// In the most simple case, a caller to Register only needs to specify an
+// exported function to be registered:
 //
-//   - Placement: "<" ... at beginning of plugin list
-//   - Placement: "<foo" ... just before plugin "foo"
-//   - Placement: ">" ... at end of plugin list
-//   - Placement: ">foo" ... directly after plugin "foo"
+//	Register(WithSymbol(DoIt))
+//
+// Further options (see [RegisterOption]) exist to (explicitly) specify
+// additional aspects, such as:
+//
+//   - [WithName] to specify the plugin name instead of deriving it from the
+//     package name of the caller.
+//   - [WithGroup] to specify the plugin group instead of taking the parent
+//     directory name of the plugin's package.
+//   - [WithPlacement] to place the plugin in the ordered list of registered
+//     plugins at a specific position, such as begin, end, before/after another
+//     specific plugin.
+//   - [WithSymbol] to register an exported function, the the symbol name
+//     taken from the exported function's name.
+//   - [WithNamedSymbol] to register an exported function and explicitly setting
+//     its symbol name.
 //
 // For convenience, the plugin name and/or group might be left unspecified
-// (zeroed): in this case, RegisterPlugin tries to discover them automatically
-// and based on the caller's filename path elements. In order to handle static
-// and dynamic (.so) plugins in a uniform manner for registration, only the
-// filename information of the caller is used. (Thus, the caller's package name
-// is ignored, as in the case of dynamic plugins this would always be "main",
-// and we don't want different discovery rules for static and dynamic plugins.)
+// (zeroed): in this case, Register tries to discover them automatically and
+// based on the caller's filename path elements. In order to handle static and
+// dynamic (.so) plugins in a uniform manner for registration, only the filename
+// information of the caller is used. (Thus, the caller's package name is
+// ignored, as in the case of dynamic plugins this would always be "main", and
+// we don't want different discovery rules for static and dynamic plugins.)
 //
-// Given a plugin function (preferably an init function) in file
-// ".../myproj/plugins/foo/plug.go" calls RegisterPlugin, and if no plugin name
+// Given a plugin self-registration function (preferably an init function) in
+// file ".../myproj/plugins/foo/plug.go" calls Register, and if no plugin name
 // has been specified explicitly, then the plugin name is taken from the name of
 // the directory (not path) where the caller is located in. In our case, the
 // plugin name would be "foo".
@@ -121,75 +130,35 @@ var pluginGroups = map[string]*PluginGroup{}
 //
 // Please note: as always, it is good practice to use the package name also as
 // the directory name of the package to avoid confusion; this also allows
-// converting static plugins into dynamic plugins rather easily.
-func RegisterPlugin(plugspec *PluginSpec) {
-	registerPlugin(plugspec, runtime.Caller)
+// converting static plugins into dynamic plugins rather easily. And
+// consequently, you really should better not repeat the mistakes in terms of
+// repository and package naming made when creating this module.
+func Register(opts ...RegisterOption) {
+	registerPlugin(runtime.Caller, opts...)
 }
 
 // Aiming for 101% coverage, we go crazy and mock runtime.Caller() ... this
 // gives "test-driven development" yet another slightly mad meaning...
-func registerPlugin(plugspec *PluginSpec,
-	runtimeCaller func(int) (uintptr, string, int, bool)) {
-	pathsep := string(os.PathSeparator)
-	// Work on a copy of the plugin specification as we might need to fill in
-	// some fields that the caller did not specify.
-	pspec := *plugspec
-	// Try to fill in "empty" plugin name and group, where necessary.
-	if pspec.Name == "" || pspec.Group == "" {
-		_, file, _, ok := runtimeCaller(1 + 1) // NOT a spelling mistake!
-		if !ok {
-			panic("unable to discover caller for discovering name and/or group plugin information")
-		}
-		plugdir := filepath.Dir(file)
-		if pspec.Name == "" {
-			pspec.Name = filepath.Base(plugdir)
-		}
-		if pspec.Group == "" {
-			pspec.Group = filepath.Base(filepath.Dir(plugdir))
-		}
+func registerPlugin(
+	runtimeCaller func(int) (uintptr, string, int, bool),
+	opts ...RegisterOption,
+) {
+	var pspec PluginSpec
+	for _, opt := range opts {
+		opt(&pspec)
 	}
-	if pspec.Name == "" || pspec.Name == "." || pspec.Name == pathsep ||
-		pspec.Group == "" || pspec.Group == "." || pspec.Group == pathsep {
-		panic("missing plugin name and/or group registration information")
-	}
+	completePluginSpec(runtimeCaller, &pspec)
 	// Discover the names of the exported functions and store them in an index
 	// for later lookup. The name discovery can be skipped for exported
 	// functions where the caller supplied a NamedSymbol instead.
 	pspec.symbolmap = map[string]Symbol{}
 	for _, symbol := range pspec.Symbols {
-		if namedsym, ok := symbol.(NamedSymbol); ok {
-			if namedsym.Name == "" {
-				continue
-			}
-			switch reflect.TypeOf(namedsym.Symbol).Kind() {
-			case reflect.Func, reflect.Ptr:
-				break
-			default:
-				continue
-			}
-			if _, ok = pspec.symbolmap[namedsym.Name]; ok {
-				panic(fmt.Sprintf("plugin %q in group %q: duplicate symbol %q",
-					pspec.Name, pspec.Group, namedsym.Name))
-			}
-			pspec.symbolmap[namedsym.Name] = namedsym.Symbol
-		} else {
-			var symname string
-			t := reflect.TypeOf(symbol)
-			switch t.Kind() {
-			case reflect.Func:
-				symname = strings.SplitN(filepath.Base(runtime.FuncForPC(
-					reflect.ValueOf(symbol).Pointer()).Name()), ".", 2)[1]
-			case reflect.Ptr:
-				symname = t.Elem().Name()
-			default:
-				continue
-			}
-			if _, ok = pspec.symbolmap[symname]; ok {
-				panic(fmt.Sprintf("plugin %q in group %q: duplicate symbol %q",
-					pspec.Name, pspec.Group, symname))
-			}
-			pspec.symbolmap[symname] = symbol
+		symname, symbol := resolveSymbol(&pspec, symbol)
+		if _, ok := pspec.symbolmap[symname]; ok {
+			panic(fmt.Sprintf("Register: plugin %q in group %q, duplicate symbol %q",
+				pspec.Name, pspec.Group, symname))
 		}
+		pspec.symbolmap[symname] = symbol
 	}
 	// Let's find the plugin's group, or if there isn't one, create a new one
 	// for it and other plugins to come that want to share this group.
@@ -203,206 +172,73 @@ func registerPlugin(plugspec *PluginSpec,
 	// cannot be registered twice within the same plugin group.
 	for _, plug := range pg.plugins {
 		if pspec.Name == plug.Name {
-			panic(fmt.Sprintf("duplicate plugin name registration '%s'", pspec.Name))
+			panic(fmt.Sprintf("Register: duplicate plugin name registration '%s'", pspec.Name))
 		}
 	}
-	pg.unsorted = true
+	pg.unordered = true
 	pg.plugins = append(pg.plugins, &pspec)
 }
 
-// New returns the plugin group object of a given name, or an empty group object
-// in case there never registered any plugins in the group specified by the
-// caller. The plugin group object then provides access to the plugins' exported
-// functions in order to call plugin functionality.
-func New(name string) *PluginGroup {
-	pg, ok := pluginGroups[name]
-	if ok {
-		if pg.unsorted {
-			pg.sort()
-			pg.unsorted = false
-		}
-	} else {
-		pg = &PluginGroup{Group: name}
-	}
-	return pg
-}
-
-// Func returns a slice of interface{}s for all those plugins in a group
-// providing the function with "name".
-func (pg *PluginGroup) Func(name string) []Symbol {
-	fs := make([]Symbol, 0, len(pg.plugins))
-	for _, plug := range pg.plugins {
-		// Only add those exported symbols that are actually functions.
-		f, ok := plug.symbolmap[name]
-		if ok && reflect.TypeOf(f).Kind() == reflect.Func {
-			fs = append(fs, f)
-		}
-	}
-	return fs
-}
-
-// FuncPrefix returns a slice of interface{}s for all plugins in a group
-// providing functions which start with "prefix"-
-func (pg *PluginGroup) FuncPrefix(prefix string) []Symbol {
-	fs := make([]Symbol, 0, len(pg.plugins))
-	for _, plug := range pg.plugins {
-		// Only add those exported symbols that are actually functions.
-		for name, f := range plug.symbolmap {
-			if strings.HasPrefix(name, prefix) && reflect.TypeOf(f).Kind() == reflect.Func {
-				fs = append(fs, f)
-			}
-		}
-	}
-	return fs
-}
-
-// PluginsFunc returns a slice with the interface{}s of a specifically named
-// exported plugin function, together with the plugins exporting them. This
-// information can be useful for logging in applications which specific plugins
-// actually get invoked for a certain function.
-func (pg *PluginGroup) PluginsFunc(name string) []PluginFunc {
-	pf := make([]PluginFunc, 0, len(pg.plugins))
-	for _, plug := range pg.plugins {
-		f, ok := plug.symbolmap[name]
+// completePluginSpec fills in any missing plugin name and/or group data,
+// glancing them from the passed caller information.
+func completePluginSpec(runtimeCaller func(int) (uintptr, string, int, bool), pspec *PluginSpec) {
+	pathsep := string(os.PathSeparator)
+	// Try to fill in "empty" plugin name and group, where necessary.
+	if pspec.Name == "" || pspec.Group == "" {
+		_, file, _, ok := runtimeCaller(3)
 		if !ok {
-			continue
+			panic("Register: unable to discover caller for discovering name and/or group plugin information")
 		}
-		switch reflect.TypeOf(f).Kind() {
+		plugdir := filepath.Dir(file)
+		if pspec.Name == "" {
+			pspec.Name = filepath.Base(plugdir)
+		}
+		if pspec.Group == "" {
+			pspec.Group = filepath.Base(filepath.Dir(plugdir))
+		}
+	}
+	if pspec.Name == "" || pspec.Name == "." || pspec.Name == pathsep ||
+		pspec.Group == "" || pspec.Group == "." || pspec.Group == pathsep {
+		panic("Register: missing plugin name and/or group registration information")
+	}
+}
+
+// resolveSymbol checks a given Symbol to be either a function or [NamedSymbol],
+// determining its name if necessary, and returing the symbol's name and
+// function.
+func resolveSymbol(pspec *PluginSpec, symbol Symbol) (string, Symbol) {
+	if namedsym, ok := symbol.(NamedSymbol); ok {
+		if namedsym.Name == "" {
+			panic(fmt.Sprintf("Register: plugin %q in group %q, zero-named symbol %#v",
+				pspec.Name, pspec.Group, symbol))
+		}
+		switch reflect.TypeOf(namedsym.Symbol).Kind() {
 		case reflect.Func, reflect.Ptr:
-			pf = append(pf, PluginFunc{
-				F:      f,
-				Name:   name,
-				Plugin: plug,
-			})
+			break
+		default:
+			panic(fmt.Sprintf("Register: plugin %q in group %q, invalid symbol %#v",
+				pspec.Name, pspec.Group, symbol))
 		}
+		return namedsym.Name, namedsym.Symbol
 	}
-	return pf
-}
-
-// PluginFunc returns the interface{} to the named exported plugin function in
-// the named plugin.
-func (pg *PluginGroup) PluginFunc(plugin string, name string) Symbol {
-	for _, plug := range pg.plugins {
-		if plug.Name == plugin {
-			f, ok := plug.symbolmap[name]
-			if ok && reflect.TypeOf(f).Kind() == reflect.Func {
-				return f
-			}
-			return nil
+	var symname string
+	t := reflect.TypeOf(symbol)
+	switch t.Kind() {
+	case reflect.Func:
+		symname = strings.SplitN(
+			filepath.Base(runtime.FuncForPC(
+				reflect.ValueOf(symbol).Pointer()).Name()),
+			".", 2)[1]
+	case reflect.Ptr:
+		e := t.Elem()
+		if e.Kind() != reflect.Struct {
+			panic(fmt.Sprintf("Register: plugin %q in group %q, invalid symbol type %t",
+				pspec.Name, pspec.Group, symbol))
 		}
+		symname = t.Elem().Name()
+	default:
+		panic(fmt.Sprintf("plugin %q in group %q: invalid symbol type %t",
+			pspec.Name, pspec.Group, symbol))
 	}
-	return nil
-}
-
-// Plugins returns the list of plugin specifications in this group. For
-// instance, this can be used to log the actual set of plugins found or
-// available.
-func (pg *PluginGroup) Plugins() []*PluginSpec {
-	return pg.plugins
-}
-
-// PluginNames returns the list of plugin names in this group. This is mostly a
-// convenience function for logging, unit testing, et cetera.
-func (pg *PluginGroup) PluginNames() []string {
-	names := make([]string, 0, len(pg.plugins))
-	for _, plugin := range pg.plugins {
-		names = append(names, plugin.Name)
-	}
-	return names
-}
-
-// Sorts the plugins by name and optionally by reference; that is, individual
-// plugins can claim to get to the front/end, or before/after a another named
-// plugin. This is with a nod to Jeremy Ruston and his incredible TiddlyWiki
-// (and its list and module sorting).
-func (pg *PluginGroup) sort() {
-	// First, sort lexicographically by plugin name (not: by plugin path).
-	sort.Slice(pg.plugins, func(a, b int) bool {
-		return pg.plugins[a].Name < pg.plugins[b].Name
-	})
-	// Second, honor the optional positional requests of individual plugins.
-	// Or, at least try to do so...
-	plugs := make([]*PluginSpec, len(pg.plugins))
-	copy(plugs, pg.plugins)
-	for _, plug := range pg.plugins {
-		// Find the next plugin to process from the original list on in the
-		// current and potentially modified list, because we need to work on the
-		// current list when shuffling plugins around.
-		var idx int
-		var pl *PluginSpec
-		for idx, pl = range plugs {
-			if pl.Name == plug.Name {
-				break
-			}
-		}
-		pos := idx // start with no change in a plugin's sequence position
-		// Does the plugin want to be positioned either before a specifically
-		// named other plugin or at the beginning?
-		if strings.HasPrefix(plug.Placement, "<") {
-			before := plug.Placement[1:]
-			if before == "" {
-				pos = 0 // tangarines FIRST (*all* of them, *snicker*)
-			} else {
-				// Find the named plugin at its current position; not at the
-				// original position, that wouldn't make sense and mix up the
-				// original intention.
-				for i, p := range plugs {
-					if before == p.Name {
-						pos = i
-						break
-					}
-				}
-			}
-		}
-		// Does the plugin want to be positioned either after another
-		// specifically named plugin or at the end of the sequence?
-		if strings.HasPrefix(plug.Placement, ">") {
-			after := plug.Placement[1:]
-			if after == "" {
-				pos = len(plugs)
-			} else {
-				// Find the named plugin at its current position; not at the
-				// original position, that wouldn't make sense and mix up the
-				// original intention.
-				for i, p := range plugs {
-					if after == p.Name {
-						pos = i + 1
-						break
-					}
-				}
-			}
-		}
-		// I severely miss Python's and Javascript's simplistic way to move
-		// elements within slices. Go is just ugly and terrible. Any of its
-		// claims to have been inspired by Python is like Steve Balmer
-		// claiming to be inspired by Unix...
-		if idx < pos {
-			// before: [.] [.] [X] [:] [:] [P] [.]
-			// after:  [.] [.] [:] [:] [P] [X] [.]
-
-			// border case: after end
-			// before: [.] [.] [X] [:] [:] P
-			// after:  [.] [.] [:] [:] [X]
-
-			// border case: at end
-			// before: [.] [.] [X] P
-			// after:  [.] [.] [P]
-			pos--
-			for i := idx; i < pos; i++ {
-				plugs[i] = plugs[i+1]
-			}
-			plugs[pos] = plug
-		} else if idx > pos {
-			// before: [.] [.] [P] [:] [:] [X] [.]
-			// after:  [.] [.] [X] [P] [:] [:] [.]
-
-			// before: [P] [:] [:] [X] [.] [.] [.]
-			// after:  [X] [P] [:] [:] [.] [.] [.]
-			for i := idx; i > pos; i-- {
-				plugs[i] = plugs[i-1]
-			}
-			plugs[pos] = plug
-		}
-	}
-	pg.plugins = plugs
+	return symname, symbol
 }

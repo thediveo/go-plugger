@@ -1,7 +1,6 @@
 //go:build plugger_dynamic && dynamicplugintesting
-// +build plugger_dynamic,dynamicplugintesting
 
-// Copyright 2019 Harald Albrecht.
+// Copyright 2019, 2022 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,12 +16,10 @@
 
 package main
 
-import plugger "github.com/thediveo/go-plugger"
+import "github.com/thediveo/go-plugger/v2"
 
 func init() {
-	plugger.RegisterPlugin(&plugger.PluginSpec{
-		Symbols: []plugger.Symbol{PlugFunc},
-	})
+	plugger.Register(plugger.WithSymbol(PlugFunc))
 }
 
 func PlugFunc() string { return "dynfooplug" }

@@ -17,8 +17,8 @@ package staticplugin
 import (
 	"fmt"
 
-	plugger "github.com/thediveo/go-plugger"
-	_ "github.com/thediveo/go-plugger/examples/staticplugin/plugins/foo"
+	"github.com/thediveo/go-plugger/v2"
+	_ "github.com/thediveo/go-plugger/v2/examples/staticplugin/plugins/foo"
 )
 
 func Example() {

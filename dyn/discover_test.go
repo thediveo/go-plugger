@@ -1,7 +1,6 @@
 //go:build plugger_dynamic
-// +build plugger_dynamic
 
-// Copyright 2019 Harald Albrecht.
+// Copyright 2019, 2022 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,9 +21,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/thediveo/go-plugger/v2"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	plugger "github.com/thediveo/go-plugger"
 )
 
 type mockedFileInfo struct {
@@ -44,13 +44,13 @@ var _ = Describe("dynamic plugin", func() {
 	Describe("dynamic plugin registering", func() {
 
 		It("discovers nothing in test plugin dir itself", func() {
-			Discover("../internal/dynamicplugintesting", false)
+			Discover("../test/dynamicplugintesting", false)
 			p := plugger.New("dynamicplugintesting").Plugins()
 			Expect(p).To(BeEmpty())
 		})
 
 		It("discovers so test plugin in subdir", func() {
-			Discover("../internal/dynamicplugintesting", true)
+			Discover("../test/dynamicplugintesting", true)
 			p := plugger.New("dynamicplugintesting").Plugins()
 			Expect(p).To(HaveLen(1))
 			Expect(p[0].Name).To(Equal("dynfoo"))
@@ -68,7 +68,7 @@ var _ = Describe("dynamic plugin", func() {
 
 		It("walks an existing plugin .so", func() {
 			Expect(walkedOnSomething(
-				false, "../internal/dynamicplugintesting/dynfoo/dynfooplug.so",
+				false, "../test/dynamicplugintesting/dynfoo/dynfooplug.so",
 				mockedFileInfo{name: "dynfooplug.so", isdir: false},
 				nil)).To(Succeed())
 		})

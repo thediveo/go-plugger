@@ -15,32 +15,29 @@
 // Package foo is a static plugin skeleton demonstrating the plugger
 // registration mechanism. This plugin automatically registers itself as a
 // plugin if it gets imported as a package into an application. For
-// demonstration purposes, a single DoIt() plugin function gets exported as
-// part of the self-registration.
+// demonstration purposes, a single DoIt() plugin function gets exported as part
+// of the self-registration.
 //
-// Example Plugin Self-Registration
+// # Example Plugin Self-Registration
 //
 // A typical way to carry out the plugin self-registration is with an init()
 // function, such as the following one. This example exports a single plugin
 // function named "DoIt". The plugin name and its plugin group will be
-// autodiscovered, because we're leaving the particular fields in a PluginSpec
-// left unspecified and thus zeroed. The plugin name thus will be the name
-// (but not path) of the directory this plugin package is located in. And the
-// plugin group will be the name of the directory where the plugin directory
-// or directories are in.
+// autodiscovered, because we're not passing any registration options related to
+// them. The plugin name thus will be the name (but not path) of the directory
+// this plugin package is located in. And the plugin group will be the name of
+// the directory where the plugin directory or directories are in.
 //
-//   func init() {
-//       plugger.RegisterPlugin(&plugger.PluginSpec{
-//           Symbols: []plugger.Symbol{DoIt},
-//       })
-//   }
+//	func init() {
+//	    plugger.Register(plugger.WithSymbol(DoIt))
+//	}
 //
 // As a sidenote, this same self-registration mechanism can be kept as is when
 // later deciding to convert a plugin from being statically linked into its
 // application to a shared library-based deployment using .so plugins.
 package foo
 
-import plugger "github.com/thediveo/go-plugger"
+import "github.com/thediveo/go-plugger/v2"
 
 // Register this plugin with its exported plugin function(s). The plugin name
 // and group are left zeroed, so they will be discovered automatically: the
@@ -50,9 +47,7 @@ import plugger "github.com/thediveo/go-plugger"
 // overridden by explicitly specifying them here in the PluginSpec given to the
 // call of RegisterPlugin.
 func init() {
-	plugger.RegisterPlugin(&plugger.PluginSpec{
-		Symbols: []plugger.Symbol{DoIt},
-	})
+	plugger.Register(plugger.WithSymbol(DoIt))
 }
 
 // DoIt is an exemplary exported plugin function. As usual, it needs to be

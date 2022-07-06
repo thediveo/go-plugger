@@ -1,9 +1,0 @@
-#!/bin/bash
-echo 🧪🧪🧪 testing static plugins only...
-go test -v -timeout 30s -count=1 ./... -cover
-echo 🧪🧪🧪 testing with dynamically loaded plugins...
-go build -tags plugger_dynamic ./...
-go build -tags plugger_dynamic,dynamicplugintesting -buildmode=plugin \
-    -o internal/dynamicplugintesting/dynfoo/dynfooplug.so \
-    ./internal/dynamicplugintesting/dynfoo
-go test -v -timeout 30s -count=1 -tags plugger_dynamic ./... -cover
