@@ -1,6 +1,6 @@
 package barplug
 
-import plugger "github.com/thediveo/go-plugger"
+import "github.com/thediveo/go-plugger/v2"
 
 // PlugFunc is an exported plugin functionality.
 func PlugFunc() string { return "barplug" }
@@ -9,7 +9,5 @@ func PlugFunc() string { return "barplug" }
 // self-registration using an init() function, but instead have to call it
 // explicitly during the flow of unit tests at the right time.
 func DoRegister() {
-	plugger.RegisterPlugin(&plugger.PluginSpec{
-		Symbols: []plugger.Symbol{PlugFunc},
-	})
+	plugger.Register(plugger.WithSymbol(PlugFunc))
 }

@@ -10,7 +10,7 @@
                 "isDefault": true
             },
             "type": "shell",
-            "command": "go build -tags plugger_dynamic ./... && go build -tags plugger_dynamic,dynamicplugintesting -buildmode=plugin -o internal/dynamicplugintesting/dynfoo/dynfooplug.so internal/dynamicplugintesting/dynfoo/dynfooplug.go && echo 'Done'",
+            "command": "go build -tags plugger_dynamic ./... && go build -tags plugger_dynamic,dynamicplugintesting -buildmode=plugin -o test/dynamicplugintesting/dynfoo/dynfooplug.so ./test/dynamicplugintesting/dynfoo/dynfooplug.go && echo 'Done'",
             "presentation": {
                 "echo": true,
                 "reveal": "always",

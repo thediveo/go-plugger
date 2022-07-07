@@ -1,4 +1,4 @@
-// Copyright 2019 Harald Albrecht.
+// Copyright 2019, 2022 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,16 +15,11 @@
 package plugger
 
 import (
-	"path/filepath"
-	"reflect"
-	"runtime"
-	"strings"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("plugin registering", func() {
+var _ = Describe("plugin registration", func() {
 
 	var oldPluginGroups map[string]*PluginGroup
 
@@ -41,326 +36,93 @@ var _ = Describe("plugin registering", func() {
 		pluginGroups = oldPluginGroups
 	})
 
-	It("panics when unable to fetch runtime caller data", func() {
-		Expect(func() {
-			registerPlugin(
-				&PluginSpec{},
-				func(int) (uintptr, string, int, bool) {
-					return uintptr(0), "", 0, false
-				})
-		}).To(Panic())
-	})
-
-	It("handles arcane caller data in registration", func() {
-		Expect(func() {
-			registerPlugin(&PluginSpec{},
-				func(int) (uintptr, string, int, bool) {
-					return uintptr(0), "plug.go", 0, true
-				})
-		}).To(Panic())
-
-		Expect(func() {
-			registerPlugin(&PluginSpec{},
-				func(int) (uintptr, string, int, bool) {
-					return uintptr(0), "/plug.go", 0, true
-				})
-		}).To(Panic())
-
-		Expect(func() {
-			registerPlugin(&PluginSpec{},
-				func(int) (uintptr, string, int, bool) {
-					return uintptr(0), "foo/plug.go", 0, true
-				})
-		}).To(Panic())
-	})
-
 	It("handles correct caller data in registration", func() {
 		Expect(func() {
-			registerPlugin(&PluginSpec{},
+			registerPlugin(
 				func(int) (uintptr, string, int, bool) {
-					return uintptr(0), "plugins/foo/plug.go", 0, true
+					return uintptr(0), "plagueins/foo/plug.go", 0, true
 				})
-		}).ToNot(Panic())
-		Expect(func() {
-			registerPlugin(&PluginSpec{},
-				func(int) (uintptr, string, int, bool) {
-					return uintptr(0), "plugins/foo/plug.go", 0, true
-				})
-		}).To(Panic())
-		p := New("plugins")
-		Expect(p.plugins).To(HaveLen(1))
-		Expect(p.plugins[0].Name).To(Equal("foo"))
+		}).NotTo(Panic())
+		plugs := New("plagueins")
+		Expect(plugs.Plugins()).To(ConsistOf(HaveField("Name", "foo")))
 	})
 
-	It("panics when registering the same plugin name twice", func() {
+	When("something is wrong", func() {
 
-	})
+		DescribeTable("panics when unable to fetch runtime caller data or with arcane caller data",
+			func(file string, ok bool) {
+				Expect(func() {
+					registerPlugin(
+						func(int) (uintptr, string, int, bool) {
+							return uintptr(0), file, 0, ok
+						})
+				}).To(Panic())
+			},
+			Entry("without caller data", "", false),
+			Entry("invalid file name, no package, etc.", "plug.go", true),
+			Entry("invalid file name, rooted path without package", "/plug.go", true),
+			Entry("invalid file name, unrooted dir without package", "foo/plug.go", true),
+		)
 
-	It("ignores non-function symbols", func() {
-		Expect(func() {
-			RegisterPlugin(&PluginSpec{
-				Group:   "group",
-				Name:    "plug1",
-				Symbols: []Symbol{42},
-			})
-		}).ToNot(Panic())
-		Expect(New("group").Plugins()[0].symbolmap).To(BeEmpty())
-	})
+		It("panics when attempting to register the same plugin twice", func() {
+			Register(WithName("alpha"), WithSymbol(func() {}))
+			Expect(func() {
+				Register(WithName("alpha"), WithSymbol(func() {}))
+			}).To(Panic())
+		})
 
-	It("ignores unnamed function symbols", func() {
-		Expect(func() {
-			RegisterPlugin(&PluginSpec{
-				Group:   "group",
-				Name:    "plug1",
-				Symbols: []Symbol{NamedSymbol{Symbol: PrefixFoo}},
-			})
-		}).ToNot(Panic())
-		Expect(New("group").Func("foo")).To(BeEmpty())
+		It("panics when attempting to register the same symbol twice", func() {
+			fn := func() {}
+			Expect(func() {
+				Register(WithName("alpha"), WithSymbol(fn), WithSymbol(fn))
+			}).To(Panic())
+		})
+
+		It("panics when attempting to register an unnamed named symbol", func() {
+			Expect(func() {
+				Register(WithName("alpha"), WithNamedSymbol("", func() {}))
+			}).To(Panic())
+		})
+
+		It("panics when attempting to register something that isn't a function or interface", func() {
+			Expect(func() {
+				Register(WithName("omega"), WithSymbol(42))
+			}).To(Panic())
+			Expect(func() {
+				omega := 42
+				Register(WithName("omega"), WithSymbol(&omega))
+			}).To(Panic())
+		})
+
 	})
 
 	It("registers named function symbols", func() {
-		Expect(func() {
-			RegisterPlugin(&PluginSpec{
-				Group:   "group",
-				Name:    "plug1",
-				Symbols: []Symbol{NamedSymbol{"Foo", PrefixFoo}},
-			})
-			RegisterPlugin(&PluginSpec{
-				Group:   "group",
-				Name:    "plug2",
-				Symbols: []Symbol{NamedSymbol{"Foo", PrefixBar}},
-			})
-		}).ToNot(Panic())
-		p := New("group")
-		Expect(p.plugins).To(HaveLen(2))
-		Expect(p.Func("Foo")).To(HaveLen(2))
+		Register(WithName("alpha"), WithGroup("group"), WithNamedSymbol("Foo", PrefixFoo))
+		Register(WithName("beta"), WithGroup("group"), WithNamedSymbol("Foo", PrefixBar))
+		plugs := New("group")
+		Expect(plugs.Plugins()).To(HaveLen(2))
+		Expect(plugs.Func("Foo")).To(HaveLen(2))
 	})
 
-	It("panics on duplicate function symbols", func() {
-		Expect(func() {
-			RegisterPlugin(&PluginSpec{
-				Group: "group",
-				Name:  "plug1",
-				Symbols: []Symbol{
-					NamedSymbol{"Foo", PrefixFoo},
-					NamedSymbol{"Foo", PrefixFoo},
-				},
-			})
-		}).To(Panic())
-		Expect(func() {
-			RegisterPlugin(&PluginSpec{
-				Group: "group",
-				Name:  "plug1",
-				Symbols: []Symbol{
-					PrefixFoo,
-					PrefixFoo,
-				},
-			})
-		}).To(Panic())
+	It("registers struct symbols", func() {
+		Register(WithName("alpha"), WithGroup("group"), WithSymbol(Ioo(&Loo{})))
+		plugs := New("group")
+		// Note: the Ioo type is lost on the symbol.
+		pis := plugs.PluginsFunc("Loo")
+		Expect(pis).To(ConsistOf(HaveField("F", And(
+			BeAssignableToTypeOf(Ioo(&Loo{})),
+			WithTransform(func(f Ioo) int { return f.Goo() }, Equal(42)),
+		))))
 	})
 
-	It("finds prefixed functions", func() {
-		Expect(func() {
-			RegisterPlugin(&PluginSpec{
-				Group:   "group",
-				Name:    "plug1",
-				Symbols: []Symbol{PrefixFoo},
-			})
-			RegisterPlugin(&PluginSpec{
-				Group:   "group",
-				Name:    "plug2",
-				Symbols: []Symbol{PrefixBar},
-			})
-			RegisterPlugin(&PluginSpec{
-				Group:   "group",
-				Name:    "plug3",
-				Symbols: []Symbol{Foo},
-			})
-		}).ToNot(Panic())
-		p := New("group")
-		Expect(p.plugins).To(HaveLen(3))
-		pf := p.FuncPrefix("Prefix")
-		Expect(pf).To(HaveLen(2))
-		// Doesn't work: Expect(pf).To(ContainElement(Symbol(PrefixFoo)))
-		pfn := make([]string, len(pf))
-		for idx, f := range pf {
-			pfn[idx] = strings.SplitN(filepath.Base(runtime.FuncForPC(
-				reflect.ValueOf(f).Pointer()).Name()), ".", 2)[1]
-		}
-		Expect(pfn).To(ConsistOf("PrefixFoo", "PrefixBar"))
-	})
-
-	It("handles pointers instead of functions", func() {
-		Expect(func() {
-			RegisterPlugin(&PluginSpec{
-				Group:   "group",
-				Name:    "plug1",
-				Symbols: []Symbol{Ioo(&Loo{})},
-			})
-		}).ToNot(Panic())
-		p := New("group")
-		Expect(p.plugins).To(HaveLen(1))
-		pi := p.PluginsFunc("Loo")
-		Expect(pi).To(HaveLen(1))
-		Expect(pi[0].F).To(BeAssignableToTypeOf(Ioo(&Loo{})))
-		Expect(pi[0].F.(Ioo).Goo()).To(Equal(42))
-	})
-
-	It("handles interfaces instead of functions", func() {
-		Expect(func() {
-			RegisterPlugin(&PluginSpec{
-				Group: "group",
-				Name:  "plug1",
-				Symbols: []Symbol{
-					NamedSymbol{
-						Name:   "Ioo",
-						Symbol: Ioo(&Loo{}),
-					}},
-			})
-		}).ToNot(Panic())
-		p := New("group")
-		Expect(p.plugins).To(HaveLen(1))
-		pi := p.PluginsFunc("Ioo")
-		Expect(pi).To(HaveLen(1))
-		Expect(pi[0].F).To(BeAssignableToTypeOf(Ioo(&Loo{})))
-		Expect(pi[0].F.(Ioo).Goo()).To(Equal(42))
-	})
-
-	It("places plugin before another plugin", func() {
-		RegisterPlugin(&PluginSpec{
-			Group: "group",
-			Name:  "plug-a",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		RegisterPlugin(&PluginSpec{
-			Group: "group",
-			Name:  "plug-b",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		RegisterPlugin(&PluginSpec{
-			Group:     "group",
-			Name:      "plug-c",
-			Placement: "<plug-b",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		Expect(New("group").PluginNames()).To(Equal([]string{"plug-a", "plug-c", "plug-b"}))
-	})
-
-	It("places plugin at the beginning", func() {
-		RegisterPlugin(&PluginSpec{
-			Group: "group",
-			Name:  "plug-a",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		RegisterPlugin(&PluginSpec{
-			Group: "group",
-			Name:  "plug-b",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		RegisterPlugin(&PluginSpec{
-			Group:     "group",
-			Name:      "plug-c",
-			Placement: "<",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		Expect(New("group").PluginNames()).To(Equal([]string{"plug-c", "plug-a", "plug-b"}))
-	})
-
-	It("places plugin after another plugin", func() {
-		RegisterPlugin(&PluginSpec{
-			Group:     "group",
-			Name:      "plug-a",
-			Placement: ">plug-b",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		RegisterPlugin(&PluginSpec{
-			Group: "group",
-			Name:  "plug-b",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		RegisterPlugin(&PluginSpec{
-			Group: "group",
-			Name:  "plug-c",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		Expect(New("group").PluginNames()).To(Equal([]string{"plug-b", "plug-a", "plug-c"}))
-	})
-
-	It("places plugin at the end", func() {
-		RegisterPlugin(&PluginSpec{
-			Group: "group",
-			Name:  "plug-a",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		RegisterPlugin(&PluginSpec{
-			Group:     "group",
-			Name:      "plug-b",
-			Placement: ">",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		RegisterPlugin(&PluginSpec{
-			Group: "group",
-			Name:  "plug-c",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		Expect(New("group").PluginNames()).To(Equal([]string{"plug-a", "plug-c", "plug-b"}))
-	})
-
-	It("correctly places plugins", func() {
-		RegisterPlugin(&PluginSpec{
-			Group: "group",
-			Name:  "plug-a",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		RegisterPlugin(&PluginSpec{
-			Group: "group",
-			Name:  "plug-x",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		RegisterPlugin(&PluginSpec{
-			Group: "group",
-			Name:  "plug-y",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		RegisterPlugin(&PluginSpec{
-			Group:     "group",
-			Name:      "plug-b",
-			Placement: ">plug-x",
-			Symbols: []Symbol{
-				NamedSymbol{"Foo", PrefixFoo},
-			},
-		})
-		Expect(New("group").PluginNames()).To(Equal([]string{"plug-a", "plug-x", "plug-b", "plug-y"}))
+	It("registers named struct symbols", func() {
+		Register(WithName("alpha"), WithGroup("group"), WithNamedSymbol("Ioo", Ioo(&Loo{})))
+		plugs := New("group")
+		pis := plugs.PluginsFunc("Ioo")
+		Expect(pis).To(ConsistOf(HaveField("F", And(
+			BeAssignableToTypeOf(Ioo(&Loo{})),
+			WithTransform(func(f Ioo) int { return f.Goo() }, Equal(42)),
+		))))
 	})
 
 })
@@ -374,5 +136,7 @@ type Ioo interface {
 }
 
 type Loo struct{}
+
+var _ Ioo = (*Loo)(nil)
 
 func (l *Loo) Goo() int { return 42 }

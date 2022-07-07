@@ -3,6 +3,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/thediveo/go-plugger.svg)](https://pkg.go.dev/github.com/thediveo/go-plugger)
 ![GitHub](https://img.shields.io/github/license/thediveo/go-asciitree)
 [![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/go-plugger)](https://goreportcard.com/report/github.com/thediveo/go-plugger)
+![Coverage](https://img.shields.io/badge/Coverage-100.0%25-brightgreen)
 
 `plugger` is a simplistic plugin manager that works with both statically linked
 as well as dynamically linked Go plugins. It supports multiple plugin groups, as
@@ -10,6 +11,15 @@ well as controlled plugin order within a group. Plugins then register named
 functions or named interfaces belonging to specific groups. Other application
 code finally queries the registered functions and interfaces, and then calls
 them as needed.
+
+## Installation
+
+To add `plugger/v2` to your Go module as a dependency (see below for migrating
+to v2):
+
+```bash
+go get github.com/thediveo/go-plugger/v2@latest
+```
 
 ## Examples
 
@@ -26,13 +36,15 @@ get all plugins in the "plugin" group and then calls some method on them.
 ```go
 import (
     // import your plugins
-    _ "github.com/thediveo/go-plugger/examples/staticplugins/plugins/foo"
-    _ "..."
+    _ "github.com/thediveo/go-plugger/v2/examples/staticplugins/plugins/foo"
+    // ...
 )
 
-plugs := plugger.New("plugins")
-for _, doit := range plugs.Func("DoIt") {
-    fmt.Println(doit.(func() string)())
+func main() {
+    plugs := plugger.New("plugins")
+    for _, doit := range plugs.Func("DoIt") {
+        fmt.Println(doit.(func() string)())
+    }
 }
 ```
 
@@ -45,7 +57,7 @@ the plugin packages, and plugger will do the rest.
 For a more elaborate "example", please also look at `internal/staticplugin/`
 and `internal/dynamicplugin/` (these are the built-in test cases).
 
-Please note that in order to use dynamically loaded plugins, the build tag
+Please note that in order to use dynamically loaded plugins, the **build tag**
 `plugger_dynamic` needs to be set. The `plugger` module now defaults to **not
 including** support for dynamically loading plugins, unless explicitly requested
 by the `plugger_dynamic` build tag. The default avoids linker warnings when
@@ -60,52 +72,69 @@ instead. Depending on your coding style that might work, or might not.
 
 ```go
 import (
-    // import your plugin interface type, say, "I".
-    "github.com/.../plugin"
     "github.com/thediveo/go-plugger"
+    ".../myplugins" // import your plugin interface type, say, "I".
 )
 
 type I struct {}
-var _ plugin.I = (plugin.I)(nil) // ensure I is actually implemented
+var _ myplugins.I = (*I)(nil) // ensure I implements plugin.I
 
 func init() {
-    RegisterPlugin(&PluginSpec{
-        Group: "group",
-        Name:  "plug1",
-        Symbols: []Symbol{
-            NamedSymbol{
-                Name:   "I",
-                Symbol: plugin.I(&I{}),
-            }},
-          })
+    plugger.RegisterPlugin(plugger.WithName("plug1"),
+        plugger.WithGroup("group"),
+        plugger.WithNamedSymbol("I", myplugins.I(&I{}))
 }
 ```
 
 ```go
 import (
-    // import your plugin interface type, say "I".
-    "github.com/.../plugin"
-
+    "github.com/thediveo/go-plugger"
+    ".../myplugins" // import your plugin interface type, say, "I".
     // import your plugins
-    _ "github.com/.../plugin/foo"
+    _ ".../myplugins/foo"
     _ "..."
 )
 
 plugs := plugger.New("plugins")
 for _, i := range plugs.Func("I") {
-    fmt.Println(i.(I).DoIt())
+    fmt.Println(i.(myplugins.I).DoIt())
 }
 ```
+
+## Migrating from v0 to v2
+
+The registration is now done by calling `Register()` (formerly
+~~`RegisterPlugin`~~) and takes _option functions_ instead of the unwieldly
+`PluginSpec`.
+
+```go
+// v0:
+//   plugger.RegisterPlugin(&plugger.PluginSpec{
+//      Group:   "group",
+//      Name:    "plug1",
+//      Symbols: []plugger.Symbol{foo},
+//   })
+//
+// v2:
+plugger.Register(plugger.WithName("plug1"), 
+    plugger.WithGroup("group"), plugger.WithSymbol(foo))
+```
+
+The other parts of the `plugger` API remain unchanged in v2, such as
+`New(groupname)`, et cetera.
+
+Please note that v2 now is very strict in what gets registered and `panic`s with
+details in order to clearly mark registration errors, such as
+non-function/interface symbols, duplicate names, …
 
 ## Run Unit Tests
 
 - VisualStudio Code: please first build the workspace, before running
-  tests.
+  tests related to dynamic plugins.
 
-- from CLI: simply run the `./testall.sh` script; it will build the shared
-  library for the test shared library plugin(s).
+- from CLI: simply run `make test`.
 
 ## Copyright and License
 
-`plugger` is Copyright 2019-2021 Harald Albrecht, and licensed under the Apache
+`plugger` is Copyright 2019-2022 Harald Albrecht, and licensed under the Apache
 License, Version 2.0.
