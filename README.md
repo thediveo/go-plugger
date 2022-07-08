@@ -1,8 +1,8 @@
 # plugger
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/thediveo/go-plugger.svg)](https://pkg.go.dev/github.com/thediveo/go-plugger)
-![GitHub](https://img.shields.io/github/license/thediveo/go-asciitree)
-[![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/go-plugger)](https://goreportcard.com/report/github.com/thediveo/go-plugger)
+[![Go Reference](https://pkg.go.dev/badge/github.com/thediveo/go-plugger.svg)](https://pkg.go.dev/github.com/thediveo/go-plugger/v2)
+![GitHub](https://img.shields.io/github/license/thediveo/go-plugger)
+[![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/go-plugger/v2)](https://goreportcard.com/report/github.com/thediveo/go-plugger/v2)
 ![Coverage](https://img.shields.io/badge/Coverage-100.0%25-brightgreen)
 
 `plugger` is a simplistic plugin manager that works with both statically linked
