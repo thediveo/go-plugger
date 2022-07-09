@@ -125,14 +125,59 @@ The other parts of the `plugger` API remain unchanged in v2, such as
 
 Please note that v2 now is very strict in what gets registered and `panic`s with
 details in order to clearly mark registration errors, such as
-non-function/interface symbols, duplicate names, …
+non-function/interface symbols, duplicate names, and other invalid registration
+information.
+
+## VSCode Tasks
+
+The included `go-plugger.code-workspace` defines the following tasks:
+
+- **View Go module documentation** task: installs `pkgsite`, if not done already
+  so, then starts `pkgsite` and opens VSCode's integrated ("simple") browser to
+  show the go-plugger/v2 documentation.
+
+- **Build workspace** task: builds all, including the shared library test
+  plugin.
+
+- **Run all tests with coverage** task: does what it says on the tin and runs
+  all tests with coverage.
+
+#### Aux Tasks
+
+- _pksite service_: auxilliary task to run `pkgsite` as a background service
+  using `scripts/pkgsite.sh`. The script leverages browser-sync and nodemon to
+  hot reload the Go module documentation on changes; many thanks to @mdaverde's
+  [_Build your Golang package docs
+  locally_](https://mdaverde.com/posts/golang-local-docs) for paving the way.
+  `scripts/pkgsite.sh` adds automatic installation of `pkgsite`, as well as the
+  `browser-sync` and `nodemon` npm packages for the local user.
+- _view pkgsite_: auxilliary task to open the VSCode-integrated "simple" browser
+  and pass it the local URL to open in order to show the module documentation
+  rendered by `pkgsite`. This requires a detour via a task input with ID
+  "_pkgsite_".
 
 ## Run Unit Tests
 
-- VisualStudio Code: please first build the workspace, before running
-  tests related to dynamic plugins.
+- **CLI:** (_recommended_) simply run `make test` in this repository's root
+  directory.
 
-- from CLI: simply run `make test`.
+- **VSCode:** please first build the workspace, before running tests related to
+  dynamic plugins.
+
+## Make Targets
+
+- `make`: lists all targets.
+- `make coverage`: runs all tests with coverage and then **updates the coverage
+  badge in `README.md`**.
+- `make pkgsite`: installs [`x/pkgsite`](golang.org/x/pkgsite/cmd/pkgsite), as
+  well as the [`browser-sync`](https://www.npmjs.com/package/browser-sync) and
+  [`nodemon`](https://www.npmjs.com/package/nodemon) npm packages first, if not
+  already done so. Then runs the `pkgsite` and hot reloads it whenever the
+  documentation changes.
+- `make report`: installs
+  [`@gojp/goreportcard`](https://github.com/gojp/goreportcard) if not yet done
+  so and then runs it on the code base.
+- `make test`: runs **all** tests (including dynamic plugins).
 
 ## Copyright and License
 
