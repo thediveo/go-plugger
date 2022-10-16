@@ -1,4 +1,4 @@
-// Copyright 2019 Harald Albrecht.
+// Copyright 2022 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package plugger_test
+/*
+Package plugin defines the exposed example plugin API.
+*/
+package plugin
 
-import (
-	"fmt"
-
-	plugger "github.com/thediveo/go-plugger/v2"
-	_ "github.com/thediveo/go-plugger/v2/examples/staticplugin/plugins/foo"
-)
-
-func Example() {
-	plugs := plugger.New("plugins")
-	for _, doit := range plugs.Func("DoIt") {
-		fmt.Printf("DoIt() returns %q\n", doit.(func() string)())
-	}
-	// Output:
-	// DoIt() returns "foo static plugin"
-}
+// DoItFn is our type of exposed plugin function.
+type DoItFn func() string

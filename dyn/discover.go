@@ -1,6 +1,4 @@
-//go:build plugger_dynamic
-
-// Copyright 2019 Harald Albrecht.
+// Copyright 2019, 2022 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,6 +30,16 @@ func Discover(path string, recursive bool) {
 	_ = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		return walkedOnSomething(recursive, path, info, err)
 	})
+}
+
+// pluginOpen is only, erm, plugged in by a wrapper calling plugin.Open instead
+// when the build tag plugger_dynamic has been specified. This prevents the Go
+// linker getting berserk when building static Go binaries without the dynamic
+// plugin loading required; otherwise the Go linker will complain as soon as the
+// plug.Open symbol is being present (even if not used at all) and a static
+// binary is to be build.
+var pluginOpen = func(path string) error {
+	panic("dynamically loading plugins disabled; build with -tags plugger_dynamic")
 }
 
 // This is an example of when to separate out an enclosed callback function in

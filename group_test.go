@@ -1,4 +1,4 @@
-// Copyright 2019, 2022 Harald Albrecht.
+// Copyright 2022 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,254 +15,151 @@
 package plugger
 
 import (
+	"fmt"
+	"reflect"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-const testGroupName = "foobar"
-const emptyGroupName = "empty-foobar"
-
-// tregister is a minimal non-checking surrogate for Register for use solely in
-// tests. For testing purposes, allow registering "things" that aren't
-// functions.
-func tregister(opts ...RegisterOption) {
-	var pspec PluginSpec
-	for _, opt := range opts {
-		opt(&pspec)
-	}
-	pspec.symbolmap = map[string]Symbol{}
-	for _, symbol := range pspec.Symbols {
-		var symname string
-		var sym Symbol
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					sym = symbol
-				}
-			}()
-			symname, sym = resolveSymbol(&pspec, symbol)
-		}()
-		pspec.symbolmap[symname] = sym
-	}
-	pg := New(pspec.Group)
-	pg.plugins = append(pg.plugins, &pspec)
-	pg.unordered = true
+// two separate (plugin) function types results in two separate (plugin) groups.
+type fooFn func() string
+type barFn func() string
+type fooIf interface {
+	Foo() string
 }
 
-var _ = Describe("plugin groups", func() {
+type fooImpl struct{ s string }
 
-	var oldPluginGroups map[string]*PluginGroup
+func (f fooImpl) Foo() string { return f.s }
+
+var _ = Describe("exposed plugin symbol groups", func() {
 
 	BeforeEach(func() {
-		// First save the old state of the registered plugin groups, and then
-		// reset, so each test here runs on an empty plugin group map. This is
-		// needed because we will otherwise trash the static plugin example,
-		// making it fail depending on the sequence of tests and examples.
-		oldPluginGroups = pluginGroups
-		pluginGroups = map[string]*PluginGroup{}
-
-		tregister(WithName("plug-a"), WithGroup(testGroupName),
-			WithNamedSymbol("DoIt", func() string { return "DoIt plug-a" }))
-		tregister(WithName("plug-b"), WithGroup(testGroupName),
-			WithNamedSymbol("DoIt", 42))
-		tregister(WithName("plug-c"), WithGroup(testGroupName),
-			WithNamedSymbol("DoIt", func() string { return "DoIt plug-c" }))
-		tregister(WithName("plug-d"), WithGroup(testGroupName),
-			WithNamedSymbol("DontYouDoIt", func() string { return "DontYouDoIt plug-d" }))
-
-		DeferCleanup(func() {
-			pluginGroups = oldPluginGroups
-		})
+		groups = map[reflect.Type]any{}
 	})
 
-	It("always returns the same PluginGroup for a given name", func() {
-		pgOne := New(emptyGroupName)
-		Expect(pgOne).NotTo(BeNil())
-		pgTwo := New(emptyGroupName)
-		Expect(pgTwo).To(BeIdenticalTo(pgOne))
-	})
+	Context("concurrency-safe", func() {
 
-	Context("querying plugin-exported functions", func() {
-
-		It("returns a function symbol", func() {
-			fns := New(testGroupName).Func("DoIt")
-			Expect(fns).To(HaveLen(2))
-			Expect(fns).To(HaveEach(BeAssignableToTypeOf(func() string { return "" })))
-		})
-
-		It("returns function symbols matching prefix", func() {
-			fns := New(testGroupName).FuncPrefix("Do")
-			Expect(fns).To(HaveLen(3))
-			Expect(fns).To(HaveEach(BeAssignableToTypeOf(func() string { return "" })))
-		})
-
-		It("returns exported functions", func() {
-			fns := New(testGroupName).PluginsFunc("DoIt")
-			Expect(fns).To(HaveLen(2))
-			Expect(fns).To(HaveEach(And(
-				HaveField("Name", Not(BeEmpty())),
-				HaveField("Plugin", HaveField("Name", Not(BeEmpty()))),
-				HaveField("F", BeAssignableToTypeOf(func() string { return "" })),
-			)))
-		})
-
-		It("returns a specific plugins exported function", func() {
-			fn := New(testGroupName).PluginFunc("plug-c", "DoIt")
-			Expect(fn).NotTo(BeNil())
-
-		})
-
-		It("returns registered plugins", func() {
-			plugs := New(testGroupName).Plugins()
-			Expect(plugs).To(HaveLen(4))
-			tregister(WithName("plug-e"), WithGroup(testGroupName),
-				WithNamedSymbol("DontYouDoIt", func() string { return "DontYouDoIt plug-e" }))
-			Expect(plugs).To(HaveLen(4))
-			plugs = New(testGroupName).Plugins()
-			Expect(plugs).To(HaveLen(5))
-		})
-
-		It("returns the names of registered plugins in a group", func() {
-			Expect(New(testGroupName).PluginNames()).To(ConsistOf(
-				"plug-a", "plug-b", "plug-c", "plug-d",
-			))
+		It("always returns the same plugin group for a specific type", func() {
+			ch := make(chan *PluginGroup[fooFn])
+			for i := 0; i < 2; i++ {
+				go func() {
+					ch <- Group[fooFn]()
+				}()
+			}
+			// Nota bene: BeIndenticalTo won't ever compare nil to nil
+			Expect(<-ch).To(BeIdenticalTo(<-ch))
 		})
 
 	})
 
-	Context("error resilience", func() {
+	It("renders a textual representation of the type and exposed symbols", func() {
+		fooIfGroup := Group[fooIf]()
+		fooIfGroup.Register(&fooImpl{s: "one"}, WithPlugin("one"))
+		fooIfGroup.Register(&fooImpl{s: "two"}, WithPlugin("two"), WithPlacement("<"))
+		for i := 0; i < 2; i++ {
+			Expect(fmt.Sprintf("%s", fooIfGroup)).To(MatchRegexp(
+				`PluginGroup\[github\.com/thediveo/go-plugger/v3\.fooIf\]: \["two":.*,"one":.*\]`))
+		}
 
-		It("handles non-existing symbols", func() {
-			group := New(testGroupName)
-			Expect(group.Func("XXX")).To(BeEmpty())
-			Expect(group.FuncPrefix("XXX")).To(BeEmpty())
-			Expect(group.PluginsFunc("XXX")).To(BeEmpty())
-			Expect(group.PluginFunc("XXX", "XXX")).To(BeNil())
-			Expect(group.PluginFunc("plug-a", "XXX")).To(BeNil())
-		})
-
+		barFnGroup := Group[barFn]()
+		barFnGroup.Register(func() string { return "one" }, WithPlugin("one"))
+		barFnGroup.Register(func() string { return "two" }, WithPlugin("two"), WithPlacement("<one"))
+		Expect(fmt.Sprintf("%s", barFnGroup)).To(MatchRegexp(
+			`PluginGroup\[github\.com/thediveo/go-plugger/v3\.barFn\]: \["two":.*\.\.func.*,"one":.*\.\.func.*\]`))
 	})
 
-	Context("plugin order", func() {
-		const orderGroupName = "test-ooorder"
-
-		It("orders lexicographically", func() {
-			group := New(orderGroupName)
-			tregister(WithName("beta"), WithGroup(orderGroupName))
-			tregister(WithName("gamma"), WithGroup(orderGroupName))
-			tregister(WithName("alpha"), WithGroup(orderGroupName))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"alpha", "beta", "gamma"}))
-		})
-
-		It("places at the beginning", func() {
-			group := New(orderGroupName)
-			tregister(WithName("beta"), WithGroup(orderGroupName))
-			tregister(WithName("gamma"), WithGroup(orderGroupName), WithPlacement("<"))
-			tregister(WithName("alpha"), WithGroup(orderGroupName))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"gamma", "alpha", "beta"}))
-		})
-
-		It("places the first at the beginning", func() {
-			group := New(orderGroupName)
-			tregister(WithName("alpha"), WithGroup(orderGroupName), WithPlacement("<"))
-			tregister(WithName("gamma"), WithGroup(orderGroupName))
-			tregister(WithName("beta"), WithGroup(orderGroupName))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"alpha", "beta", "gamma"}))
-		})
-
-		It("places at the end", func() {
-			group := New(orderGroupName)
-			tregister(WithName("beta"), WithGroup(orderGroupName), WithPlacement(">"))
-			tregister(WithName("gamma"), WithGroup(orderGroupName))
-			tregister(WithName("alpha"), WithGroup(orderGroupName))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"alpha", "gamma", "beta"}))
-		})
-
-		It("places the last at the end", func() {
-			group := New(orderGroupName)
-			tregister(WithName("beta"), WithGroup(orderGroupName))
-			tregister(WithName("alpha"), WithGroup(orderGroupName))
-			tregister(WithName("gamma"), WithGroup(orderGroupName), WithPlacement(">"))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"alpha", "beta", "gamma"}))
-		})
-
-		It("places before another named plugin", func() {
-			group := New(orderGroupName)
-			tregister(WithName("beta"), WithGroup(orderGroupName))
-			tregister(WithName("gamma"), WithGroup(orderGroupName))
-			tregister(WithName("alpha"), WithGroup(orderGroupName), WithPlacement("<gamma"))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"beta", "alpha", "gamma"}))
-		})
-
-		It("places before another named plugin at the beginning", func() {
-			group := New(orderGroupName)
-			tregister(WithName("beta"), WithGroup(orderGroupName))
-			tregister(WithName("gamma"), WithGroup(orderGroupName))
-			tregister(WithName("alpha"), WithGroup(orderGroupName), WithPlacement("<beta"))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"alpha", "beta", "gamma"}))
-		})
-
-		It("places itself before itself", func() {
-			group := New(orderGroupName)
-			tregister(WithName("beta"), WithGroup(orderGroupName), WithPlacement("<beta"))
-			tregister(WithName("gamma"), WithGroup(orderGroupName))
-			tregister(WithName("alpha"), WithGroup(orderGroupName))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"alpha", "beta", "gamma"}))
-		})
-
-		It("places after another named plugin", func() {
-			group := New(orderGroupName)
-			tregister(WithName("beta"), WithGroup(orderGroupName))
-			tregister(WithName("gamma"), WithGroup(orderGroupName))
-			tregister(WithName("alpha"), WithGroup(orderGroupName), WithPlacement(">beta"))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"beta", "alpha", "gamma"}))
-		})
-
-		It("places after another named plugin at the end", func() {
-			group := New(orderGroupName)
-			tregister(WithName("beta"), WithGroup(orderGroupName))
-			tregister(WithName("gamma"), WithGroup(orderGroupName))
-			tregister(WithName("alpha"), WithGroup(orderGroupName), WithPlacement(">gamma"))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"beta", "gamma", "alpha"}))
-		})
-
-		It("places itself after itself", func() {
-			group := New(orderGroupName)
-			tregister(WithName("beta"), WithGroup(orderGroupName), WithPlacement(">beta"))
-			tregister(WithName("gamma"), WithGroup(orderGroupName))
-			tregister(WithName("alpha"), WithGroup(orderGroupName))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"alpha", "beta", "gamma"}))
-		})
-
-		It("ignores an unknown placement", func() {
-			group := New(orderGroupName)
-			tregister(WithName("beta"), WithGroup(orderGroupName), WithPlacement(">coma"))
-			tregister(WithName("gamma"), WithGroup(orderGroupName))
-			tregister(WithName("alpha"), WithGroup(orderGroupName))
-			group.sort()
-			Expect(group.PluginNames()).To(Equal([]string{"alpha", "beta", "gamma"}))
-		})
-
+	It("doesn't mix exported symbol types", func() {
+		fooGroup := Group[fooFn]()
+		Expect(fooGroup).NotTo(BeNil())
+		barGroup := Group[barFn]()
+		Expect(barGroup).NotTo(BeNil())
+		Expect(fooGroup).NotTo(BeIdenticalTo(barGroup))
 	})
 
-	DescribeTable("knows what a function symbol is",
-		func(s Symbol, expected bool) {
-			Expect(IsFunc(s)).To(Equal(expected))
+	It("registers symbols and sorts them", func() {
+		g := Group[fooFn]()
+		Expect(g).NotTo(BeNil())
+		g.Register(func() string { return "one" }, WithPlugin("one"))
+		g.Register(func() string { return "two" }, WithPlugin("two"), WithPlacement("<one"))
+		Expect(g.Plugins()).To(ConsistOf("two", "one"))
+		syms := g.Symbols()
+		Expect(syms).To(HaveLen(2))
+		Expect([]string{
+			syms[0](), syms[1](),
+		}).To(ContainElements("one", "two"))
+		Expect(g.PluginsSymbols()).To(ConsistOf(
+			HaveField("Plugin", "two"),
+			HaveField("Plugin", "one"),
+		))
+	})
+
+	It("finds a specific plugin's symbol", func() {
+		g := Group[fooFn]()
+		Expect(g).NotTo(BeNil())
+		g.Register(func() string { return "one" }, WithPlugin("one"))
+		Expect(g.PluginSymbol("foo")).To(BeNil())
+		foofn := g.PluginSymbol("one")
+		Expect(foofn).NotTo(BeNil())
+		Expect(foofn()).To(Equal("one"))
+	})
+
+	It("fills in the plugin name if missing", func() {
+		g := Group[fooFn]()
+		Expect(g).NotTo(BeNil())
+		g.Register(func() string { return "one" })
+		Expect(g.PluginsSymbols()).To(HaveEach(HaveField("Plugin", "go-plugger")))
+	})
+
+	DescribeTable("orders plugins",
+		func(a, ap, b, bp, c, cp string, expected []string) {
+			g := &PluginGroup[any]{
+				symbols: []Symbol[any]{
+					{Plugin: a, Placement: ap},
+					{Plugin: b, Placement: bp},
+					{Plugin: c, Placement: cp},
+				},
+			}
+			g.sort()
+			Expect(g.Plugins()).To(Equal(expected))
 		},
-		Entry("not a symbol", 42, false),
-		Entry("a func", func() {}, true),
-		Entry("a named symbol", NamedSymbol{"foo", func() {}}, true),
+		Entry("lexicographically",
+			"beta", "", "gamma", "", "alpha", "",
+			[]string{"alpha", "beta", "gamma"}),
+		Entry("places at the beginning",
+			"beta", "", "gamma", "<", "alpha", "",
+			[]string{"gamma", "alpha", "beta"}),
+		Entry("places the first at the beginning",
+			"alpha", "<", "gamma", "", "beta", "",
+			[]string{"alpha", "beta", "gamma"}),
+		Entry("places at the end",
+			"beta", ">", "gamma", "", "alpha", "",
+			[]string{"alpha", "gamma", "beta"}),
+		Entry("places the last at the end",
+			"beta", "", "alpha", "", "gamma", ">",
+			[]string{"alpha", "beta", "gamma"}),
+		Entry("places before another named plugin",
+			"beta", "", "gamma", "", "alpha", "<gamma",
+			[]string{"beta", "alpha", "gamma"}),
+		Entry("places before another named plugin at the beginning",
+			"beta", "", "gamma", "", "alpha", "<beta",
+			[]string{"alpha", "beta", "gamma"}),
+		Entry("places itself before itself",
+			"beta", "<beta", "gamma", "", "alpha", "",
+			[]string{"alpha", "beta", "gamma"}),
+		Entry("places after another named plugin",
+			"beta", "", "gamma", "", "alpha", ">beta",
+			[]string{"beta", "alpha", "gamma"}),
+		Entry("places after another named plugin at the end",
+			"beta", "", "gamma", "", "alpha", ">gamma",
+			[]string{"beta", "gamma", "alpha"}),
+		Entry("places itself after itself",
+			"beta", ">beta", "gamma", "", "alpha", "",
+			[]string{"alpha", "beta", "gamma"}),
+		Entry("ignores an unknown placement",
+			"beta", ">coma", "gamma", "", "alpha", "",
+			[]string{"alpha", "beta", "gamma"}),
 	)
 
 })

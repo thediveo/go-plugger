@@ -9,5 +9,6 @@ if ! command -v gobadge &>/dev/null; then
 fi
 
 go test -covermode=atomic -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o=coverage.html
 go tool cover -func=coverage.out -o=coverage.out
 gobadge -filename=coverage.out -green=80 -yellow=50

@@ -12,16 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package plugger
+/*
+Package dynplug is an example plugin registering its exposed DoIt function
+symbol; it intended to be loaded dynamically.
+*/
+package main
 
 import (
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/thediveo/go-plugger/v3"
+	"github.com/thediveo/go-plugger/v3/example/plugin"
 )
 
-func TestPlugger(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "plugger package")
+// DoIt is an exposed plugin symbol.
+func DoIt() string { return "dynplug dynamic plugin" }
+
+// Typesafe registration of our exposed plugin symbol.
+func init() {
+	plugger.Group[plugin.DoItFn]().Register(DoIt)
 }
+
+// Dummy main required in order to build this dynamic plugin.
+func main() {}

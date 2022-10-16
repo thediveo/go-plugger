@@ -6,20 +6,19 @@ help: ## list available targets
 
 clean: ## cleans up build and testing artefacts
 	rm -f coverage.html coverage.out coverage.txt
-	rm -f test/dynamicplugintesting/dynfooplug.so
+	rm -f example/dynplug/dynplug.so
 
 coverage: ## gathers coverage and updates README badge
 	@scripts/cov.sh
 
 pkgsite: ## serves Go documentation on port 6060
-	@echo "navigate to: http://localhost:6060/github.com/thediveo/go-plugger/v2"
+	@echo "navigate to: http://localhost:6060/github.com/thediveo/go-plugger/v3"
 	@scripts/pkgsite.sh
 
 report: ## run goreportcard on this module
 	@scripts/goreportcard.sh
 
 test: ## run unit tests
-	@go build -tags plugger_dynamic,dynamicplugintesting -buildmode=plugin \
-	    -o test/dynamicplugintesting/dynfoo/dynfooplug.so \
-    	./test/dynamicplugintesting/dynfoo
-	@go test -v -p=1 -count=1 -tags plugger_dynamic,dynamicplugintesting ./...
+	@go build -race -tags plugger_dynamic -buildmode=plugin \
+	    -o example/dynplug/dynplug.so ./example/dynplug
+	@go test -v -race -p=1 -count=1 -tags plugger_dynamic ./...

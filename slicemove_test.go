@@ -15,13 +15,24 @@
 package plugger
 
 import (
-	"testing"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-func TestPlugger(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "plugger package")
-}
+var _ = Describe("slices", func() {
+
+	DescribeTable("move slice elements",
+		func(from, to int, expected []string) {
+			s := []string{"A", "B", "C", "D", "E"}
+			move(s, from, to)
+			Expect(s).To(Equal(expected))
+		},
+		Entry("don't move", 2, 2, []string{"A", "B", "C", "D", "E"}),
+		Entry("forward", 1, 3, []string{"A", "C", "B", "D", "E"}),
+		Entry("to end", 1, 5, []string{"A", "C", "D", "E", "B"}),
+		Entry("at end", 4, 5, []string{"A", "B", "C", "D", "E"}),
+		Entry("rewind", 3, 1, []string{"A", "D", "B", "C", "E"}),
+		Entry("at start", 0, 0, []string{"A", "B", "C", "D", "E"}),
+	)
+
+})

@@ -1,4 +1,4 @@
-//go:build plugger_dynamic && dynamicplugintesting
+//go:build plugger_dynamic
 
 // Copyright 2019, 2022 Harald Albrecht.
 //
@@ -14,12 +14,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package dyn
 
-import "github.com/thediveo/go-plugger/v2"
+import "plugin"
 
+// This, erm, "plugs in" the plugin.Open implementation only when the build
+// tag/constraint plugger_dynamic has been specified. This prevents the Go
+// linker getting berserk when building static Go binaries without the dynamic
+// plugin loading required; otherwise the Go linker will complain as soon as the
+// plug.Open symbol is being present (even if not used at all) and a static
+// binary is to be build.
 func init() {
-	plugger.Register(plugger.WithSymbol(PlugFunc))
+	pluginOpen = func(path string) error {
+		_, err := plugin.Open(path)
+		return err
+	}
 }
-
-func PlugFunc() string { return "dynfooplug" }

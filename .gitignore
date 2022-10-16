@@ -1,6 +1,6 @@
-.directory
-*.so
-*.log
 coverage.txt
 coverage.out
 coverage.html
+*.so
+*.dll
+*.log
