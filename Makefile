@@ -1,4 +1,4 @@
-.PHONY: help clean coverage pkgsite reportcard test
+.PHONY: help chores clean coverage pkgsite report test vuln
 
 help: ## list available targets
 	@# Shamelessly stolen from Gomega's Makefile
@@ -22,3 +22,10 @@ test: ## run unit tests
 	@go build -race -tags plugger_dynamic -buildmode=plugin \
 	    -o example/dynplug/dynplug.so ./example/dynplug
 	@go test -v -race -p=1 -count=1 -tags plugger_dynamic ./...
+
+vuln: ## runs govulncheck
+	@scripts/vuln.sh
+
+chores: ## updates Go binaries and NPM helper packages if necessary
+	@scripts/chores.sh
+	
