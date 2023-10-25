@@ -2,10 +2,12 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
   pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [ master ]
+    branches:
+      - master
+      - develop
   schedule:
     - cron: '36 13 * * 1'
 
@@ -29,11 +31,11 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # pin@v3
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # pin@v3
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@168b99b3c22180941ae7dbdd5f5c9678ede476ba # pin@v2
+        uses: github/codeql-action/init@49abf0ba24d0b7953cb586944e918a0b92074c80 # pin@v2
         with:
           languages: ${{ matrix.language }}
           # If you wish to specify custom queries, you can do so here or in a config file.
@@ -41,10 +43,10 @@ jobs:
           # Prefix the list here with "+" to use these queries and those in the config file.
           # queries: ./path/to/local/query, your-org/your-repo/queries@main
 
-      # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
-      # If this step fails, then you should remove it and run the build manually (see below)
+          # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
+          # If this step fails, then you should remove it and run the build manually (see below)
       - name: Autobuild
-        uses: github/codeql-action/autobuild@168b99b3c22180941ae7dbdd5f5c9678ede476ba # pin@v2
+        uses: github/codeql-action/autobuild@49abf0ba24d0b7953cb586944e918a0b92074c80 # pin@v2
 
       # ℹ️ Command-line programs to run using the OS shell.
       # 📚 https://git.io/JvXDl
@@ -55,4 +57,4 @@ jobs:
       #   make bootstrap
       #   make release
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@168b99b3c22180941ae7dbdd5f5c9678ede476ba # pin@v2
+        uses: github/codeql-action/analyze@49abf0ba24d0b7953cb586944e918a0b92074c80 # pin@v2
