@@ -10,7 +10,7 @@
                 "isDefault": true
             },
             "type": "shell",
-            "command": "go build -tags plugger_dynamic ./... && go build -tags plugger_dynamic,dynamicplugintesting -buildmode=plugin -o test/dynamicplugintesting/dynfoo/dynfooplug.so ./test/dynamicplugintesting/dynfoo/dynfooplug.go && echo 'Done'",
+            "command": "go build -tags plugger_dynamic ./... && go build -tags plugger_dynamic -buildmode=plugin -o example/dynplug/dynplug.so ./example/dynplug && echo 'Done'",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
@@ -27,8 +27,11 @@
                 "kind": "test",
                 "isDefault": true
             },
+            "dependsOn": [
+                "Build workspace"
+            ],
             "type": "shell",
-            "command": "go test -v -timeout 30s ./... -cover",
+            "command": "go test -tags plugger_dynamic -v -timeout 30s ./... -cover",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
@@ -71,7 +74,7 @@
             "id": "pkgsite",
             "type": "command",
             "command": "simpleBrowser.api.open",
-            "args": "http://localhost:6060/github.com/thediveo/go-plugger/v2"
+            "args": "http://localhost:6060/github.com/thediveo/go-plugger/v3"
         }
     ]
 }

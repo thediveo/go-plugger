@@ -1,15 +1,24 @@
-module github.com/thediveo/go-plugger/v2
+module github.com/thediveo/go-plugger/v3
 
-go 1.18
+go 1.19
 
 require (
-	github.com/onsi/ginkgo/v2 v2.1.4
-	github.com/onsi/gomega v1.19.0
+	github.com/onsi/ginkgo/v2 v2.9.2
+	github.com/onsi/gomega v1.27.6
 )
 
 require (
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
-	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8 // indirect
-	golang.org/x/text v0.3.7 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	github.com/go-logr/logr v1.2.3 // indirect
+	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
+	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
+	golang.org/x/tools v0.7.0 // indirect
+)
+
+require (
+	github.com/google/go-cmp v0.5.9 // indirect
+	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
+	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

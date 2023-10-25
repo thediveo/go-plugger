@@ -1,4 +1,4 @@
-// Copyright 2019, 2022 Harald Albrecht.
+// Copyright 2022 Harald Albrecht.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,158 +15,203 @@
 package plugger
 
 import (
+	"fmt"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
+
+	"golang.org/x/exp/slices"
 )
 
-// PluginGroup is a named group of ordered registered plugins. Plugins that do
-// not register any specific placement requirements (such as first, last, or
-// before/after another specific plugin) are placed in lexicographic order.
-type PluginGroup struct {
-	Group     string        // name of group of plugins this plugger manages.
-	unordered bool          // has the list of registered plugins been ordered or is it still arbitrary?
-	plugins   []*PluginSpec // ordered list of registered plugins (plugin specifications).
+// PluginGroup represents the exposed plugin symbols for a particular symbol
+// type, with the exposed symbols ordered by plugin name, or alternatively, by
+// plugin placement.
+type PluginGroup[T any] struct {
+	mu      sync.RWMutex // protects the following elements.
+	ordered bool         // has the list of registered plugin symbols been ordered or is it still unordered?
+	symbols []Symbol[T]  // (ordered) list of registered plugin symbols.
 }
 
-// New returns the plugin group object of a given group name, or an empty group
-// object in case there were never any plugins registered in the specified
-// group. The plugin group object then provides access to the registered
-// exported functions of plugins in order to call plugin functionality. Multiple
-// calls for the same group always return the same PluginGroup object.
-func New(name string) *PluginGroup {
-	pg, ok := pluginGroups[name]
-	if ok {
-		if pg.unordered {
-			pg.sort()
-			pg.unordered = false
-		}
-	} else {
-		pg = &PluginGroup{Group: name}
-		pluginGroups[name] = pg
+// Group returns the [*PluginGroup] object for the given exposed symbol type T.
+// Calling Group multiple times for the same exposed symbol type T always
+// returns the same [PluginGroup] object.
+func Group[T any]() *PluginGroup[T] {
+	var dummyCompositeT []T // https://stackoverflow.com/a/18316266
+	t := reflect.TypeOf(dummyCompositeT).Elem()
+	groupsmu.Lock()
+	defer groupsmu.Unlock()
+	group := groups[t]
+	if group == nil {
+		group = &PluginGroup[T]{}
+		groups[t] = group
 	}
-	return pg
+	return group.(*PluginGroup[T])
 }
 
-// Func returns a slice of Symbols for all those plugins in a group actually
-// providing the function (symbol) with specified name.
-func (pg *PluginGroup) Func(name string) []Symbol {
-	fs := make([]Symbol, 0, len(pg.plugins))
-	for _, plug := range pg.plugins {
-		// Only add registered exported symbols that actually are functions.
-		if fn, ok := plug.symbolmap[name]; ok && IsFunc(fn) {
-			fs = append(fs, fn)
-		}
-	}
-	return fs
-}
+// groups maps function and interface types to their (typed) plugin groups.
+var groupsmu sync.Mutex
+var groups = map[reflect.Type]any{}
 
-// FuncPrefix returns a slice of Symbols for all plugins in a group providing
-// functions with names that start with the specified "prefix".
-func (pg *PluginGroup) FuncPrefix(prefix string) []Symbol {
-	fs := make([]Symbol, 0, len(pg.plugins))
-	for _, plug := range pg.plugins {
-		// Only add those exported symbols that actually are functions.
-		for name, f := range plug.symbolmap {
-			if strings.HasPrefix(name, prefix) && IsFunc(f) {
-				fs = append(fs, f)
-			}
-		}
-	}
-	return fs
-}
+// String renders a textual representation of a particular Group, showing the
+// managed symbol type as well as the plugin-exposed symbols registered in this
+// group.
+func (g *PluginGroup[T]) String() string {
+	g.lock()
+	defer g.unlock()
 
-// PluginsFunc returns a slice with the PluginFuncs of a specifically named
-// exported plugin function, together with the plugins exporting them. This
-// information can be used in applications to log which concrete plugins get
-// invoked for a certain function.
-func (pg *PluginGroup) PluginsFunc(name string) []PluginFunc {
-	pf := make([]PluginFunc, 0, len(pg.plugins))
-	for _, plug := range pg.plugins {
-		f, ok := plug.symbolmap[name]
-		if !ok {
-			continue
+	var s strings.Builder
+	s.WriteString("PluginGroup[")
+	var dummyCompositeT []T // https://stackoverflow.com/a/18316266
+	symbolType := reflect.TypeOf(dummyCompositeT).Elem()
+	s.WriteString(symbolType.PkgPath())
+	s.WriteRune('.')
+	s.WriteString(symbolType.Name())
+	s.WriteString("]: [")
+	for idx, symbol := range g.symbols {
+		if idx > 0 {
+			s.WriteRune(',')
 		}
-		switch reflect.TypeOf(f).Kind() {
-		case reflect.Func, reflect.Ptr:
-			pf = append(pf, PluginFunc{
-				F:      f,
-				Name:   name,
-				Plugin: plug,
-			})
+		s.WriteRune('"')
+		s.WriteString(symbol.Plugin)
+		s.WriteString(`":`)
+		if fn := runtime.FuncForPC(reflect.ValueOf(symbol.S).Pointer()); fn != nil {
+			s.WriteString(fn.Name())
+		} else {
+			s.WriteString(fmt.Sprintf("%#v", symbol.S))
 		}
 	}
-	return pf
+	s.WriteRune(']')
+	return s.String()
 }
 
-// PluginFunc returns the Symbol to the named exported plugin function in the
-// named plugin.
-func (pg *PluginGroup) PluginFunc(plugin string, name string) Symbol {
-	for _, plug := range pg.plugins {
-		if plug.Name == plugin {
-			f, ok := plug.symbolmap[name]
-			if ok && IsFunc(f) {
-				return f
-			}
-			return nil
+// RegisterOption allows optional registration information to be passed to the
+// Register method of plugin groups.
+type RegisterOption func(symbolSetter)
+
+// Register a plugin-exposed symbol, with optional additional registration
+// information.
+func (g *PluginGroup[T]) Register(symbol T, opts ...RegisterOption) {
+	s := Symbol[T]{S: symbol}
+	s.Validate() // panics if mistreated to a non-function and non-interface type symbol.
+	s.complete(1, runtime.Caller)
+	for _, option := range opts {
+		option(&s)
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.ordered = false
+	g.symbols = append(g.symbols, s)
+}
+
+// WithPlugin registers an exposed symbol with the given plugin name in
+// [plugger.PluginGroup.Register].
+func WithPlugin(name string) func(symbolSetter) {
+	return func(s symbolSetter) {
+		s.setPlugin(name)
+	}
+}
+
+// WithPlacement registers an exposed symbol with the given (plugin) placement
+// hint in [plugger.PluginGroup.Register].
+func WithPlacement(placement string) func(symbolSetter) {
+	return func(s symbolSetter) {
+		s.setPlacement(placement)
+	}
+}
+
+// Symbols returns all symbols (functions or interfaces) exposed by the plugins
+// in this Group. This is always a clean and ordered copy of the list of exposed
+// symbols.
+func (g *PluginGroup[T]) Symbols() []T {
+	g.lock()
+	defer g.unlock()
+
+	s := make([]T, 0, len(g.symbols))
+	for _, symbol := range g.symbols {
+		s = append(s, symbol.S)
+	}
+	return s
+}
+
+// PluginsSymbols returns all exposed symbols together with the names of the
+// plugins exposing them. This is always a clean and ordered copy of the
+// [Symbol] objects.
+func (g *PluginGroup[T]) PluginsSymbols() []Symbol[T] {
+	g.lock()
+	defer g.unlock()
+
+	return slices.Clone(g.symbols)
+}
+
+// PluginSymbol returns the exposed symbol of the plugin identified by its name,
+// or the zero symbol value if no such named plugin exists in this symbol group.
+func (g *PluginGroup[T]) PluginSymbol(name string) T {
+	g.lock()
+	defer g.unlock()
+
+	for _, symbol := range g.symbols {
+		if symbol.Plugin == name {
+			return symbol.S
 		}
 	}
-	return nil
+	var zero T
+	return zero
 }
 
-// Plugins returns (a copy of) the list of plugin specifications in this group.
-// For instance, this can be used to log the actual set of registered plugins.
-func (pg *PluginGroup) Plugins() []*PluginSpec {
-	return append(pg.plugins[:0:0], pg.plugins...)
-}
+// Plugins returns the names of all plugins exposing symbols in this plugin
+// group. The returned list is always ordered, based on the plugin names and
+// placement hints.
+func (g *PluginGroup[T]) Plugins() []string {
+	g.lock()
+	defer g.unlock()
 
-// PluginNames returns the list of plugin names in this group. This is mostly a
-// convenience function for logging, unit testing, et cetera.
-func (pg *PluginGroup) PluginNames() []string {
-	names := make([]string, 0, len(pg.plugins))
-	for _, plugin := range pg.plugins {
-		names = append(names, plugin.Name)
+	plugins := make([]string, 0, len(g.symbols))
+	for _, symbol := range g.symbols {
+		plugins = append(plugins, symbol.Plugin)
 	}
-	return names
+	return plugins
 }
 
-// Sorts the plugins by name and optionally by reference; that is, individual
+// sort the plugins by name and optionally by reference; that is, individual
 // plugins can claim to get to the front/end, or before/after a another named
-// plugin. This is with a nod to Jeremy Ruston and his incredible TiddlyWiki
-// (and its list and module sorting).
-func (pg *PluginGroup) sort() {
+// plugin. This method must be called under write lock.
+//
+// The plugin ordering mechanism is with a nod to Jeremy Ruston and his
+// incredible TiddlyWiki (in particular, its list and module sorting).
+func (g *PluginGroup[T]) sort() {
 	// First, sort lexicographically by plugin name (not: by plugin path).
-	sort.Slice(pg.plugins, func(a, b int) bool {
-		return pg.plugins[a].Name < pg.plugins[b].Name
+	sort.Slice(g.symbols, func(a, b int) bool {
+		return g.symbols[a].Plugin < g.symbols[b].Plugin
 	})
 	// Second, honor the optional positional requests of individual plugins.
 	// Or, at least try to do so...
-	plugs := make([]*PluginSpec, len(pg.plugins))
-	copy(plugs, pg.plugins)
-	for _, plug := range pg.plugins {
+	symbols := slices.Clone(g.symbols)
+	for _, symbol := range g.symbols {
 		// Find the next plugin to process from the original list on in the
 		// current and potentially modified list, because we need to work on the
 		// current list when shuffling plugins around.
 		var idx int
-		var pl *PluginSpec
-		for idx, pl = range plugs {
-			if pl.Name == plug.Name {
+		var sym Symbol[T]
+		for idx, sym = range symbols {
+			if sym.Plugin == symbol.Plugin {
 				break
 			}
 		}
 		pos := idx // start with no change in a plugin's sequence position
 		// Does the plugin want to be positioned either before a specifically
 		// named other plugin or at the beginning?
-		if strings.HasPrefix(plug.Placement, "<") {
-			before := plug.Placement[1:]
+		if strings.HasPrefix(symbol.Placement, "<") {
+			before := symbol.Placement[1:]
 			if before == "" {
 				pos = 0 // tangarines FIRST (*all* of them, *snicker*)
 			} else {
 				// Find the named plugin at its current position; not at the
 				// original position, that wouldn't make sense and mix up the
 				// original intention.
-				for i, p := range plugs {
-					if before == p.Name {
+				for i, p := range symbols {
+					if before == p.Plugin {
 						pos = i
 						break
 					}
@@ -175,63 +220,52 @@ func (pg *PluginGroup) sort() {
 		}
 		// Does the plugin want to be positioned either after another
 		// specifically named plugin or at the end of the sequence?
-		if strings.HasPrefix(plug.Placement, ">") {
-			after := plug.Placement[1:]
+		if strings.HasPrefix(symbol.Placement, ">") {
+			after := symbol.Placement[1:]
 			if after == "" {
-				pos = len(plugs)
+				pos = len(symbols)
 			} else {
 				// Find the named plugin at its current position; not at the
 				// original position, that wouldn't make sense and mix up the
 				// original intention.
-				for i, p := range plugs {
-					if after == p.Name {
+				for i, p := range symbols {
+					if after == p.Plugin {
 						pos = i + 1
 						break
 					}
 				}
 			}
 		}
-		// I severely miss Python's and Javascript's simplistic way to move
-		// elements within slices. Go is just ugly and terrible. Any of its
-		// claims to have been inspired by Python is like Steve Balmer
-		// claiming to be inspired by Unix...
-		if idx < pos {
-			// before: [.] [.] [X] [:] [:] [P] [.]
-			// after:  [.] [.] [:] [:] [P] [X] [.]
-
-			// border case: after end
-			// before: [.] [.] [X] [:] [:] P
-			// after:  [.] [.] [:] [:] [X]
-
-			// border case: at end
-			// before: [.] [.] [X] P
-			// after:  [.] [.] [P]
-			pos--
-			for i := idx; i < pos; i++ {
-				plugs[i] = plugs[i+1]
-			}
-			plugs[pos] = plug
-		} else if idx > pos {
-			// before: [.] [.] [P] [:] [:] [X] [.]
-			// after:  [.] [.] [X] [P] [:] [:] [.]
-
-			// before: [P] [:] [:] [X] [.] [.] [.]
-			// after:  [X] [P] [:] [:] [.] [.] [.]
-			for i := idx; i > pos; i-- {
-				plugs[i] = plugs[i-1]
-			}
-			plugs[pos] = plug
-		}
+		symbols = move(symbols, idx, pos)
 	}
-	pg.plugins = plugs
+	g.symbols = symbols
 }
 
-// IsFunc returns true, if the given [Symbol] is either a function or a
-// [NamedSymbol] that in turn also represents a function. For everything else,
-// IsFunc returns false.
-func IsFunc(s Symbol) bool {
-	if namedsym, ok := s.(NamedSymbol); ok {
-		return reflect.TypeOf(namedsym.Symbol).Kind() == reflect.Func
+// lock locks the plugin group against concurrent write changes and sorts the
+// plugin exposed list of symbols, if necessary. The caller needs to (defer to)
+// unlock after having done its work.
+func (g *PluginGroup[T]) lock() {
+	g.mu.RLock()
+	// As we cannot downgrade a write lock into a read lock atomatically, we
+	// need to rinse and repeat until got our read lock on a sorted exposed
+	// plugin symbols list...
+	for !g.ordered { // https://github.com/golang/go/issues/4026#issuecomment-66069822
+		g.mu.RUnlock()
+		// Here, another goroutine might win an unintended race with us to sort
+		// the list of exposed plugin symbols, so skip the sort operation if we
+		// finally got the write lock on a sorted list.
+		g.mu.Lock()
+		if !g.ordered {
+			g.sort()
+			g.ordered = true
+		}
+		g.mu.Unlock()
+		// Here, the list might get unsorted again if we're unlucky.
+		g.mu.RLock()
 	}
-	return reflect.TypeOf(s).Kind() == reflect.Func
+}
+
+// unlock unlocks the plugin group.
+func (g *PluginGroup[T]) unlock() {
+	g.mu.RUnlock()
 }

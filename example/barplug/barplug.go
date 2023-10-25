@@ -12,16 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package plugger
+/*
+Package barplug is an example plugin registering its exposed DoIt function
+symbol.
+*/
+package barplug
 
 import (
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/thediveo/go-plugger/v3"
+	"github.com/thediveo/go-plugger/v3/example/plugin"
 )
 
-func TestPlugger(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "plugger package")
+// DoIt is an exposed plugin symbol.
+func DoIt() string { return "barplug static plugin" }
+
+// Typesafe registration of our exposed plugin symbol.
+func init() {
+	plugger.Group[plugin.DoItFn]().Register(DoIt)
 }

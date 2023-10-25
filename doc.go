@@ -1,99 +1,101 @@
 /*
-Package plugger is a simplistic plugin manager that works with both statically
-linked as well as dynamically linked Go plugins. It supports multiple plugin
-groups, as well as controlling the order of plugins within a group.
+Package plugger v3 implements a minimalist plugin manager featuring type-safe
+handling of functions and interfaces (“symbols”) exposed by plugins. Type safety
+is checked at compile time, thanks to Go Generics. Plugins usually are realized
+as packages exposing certain well-defined functions or interfaces by registering
+these. Plugin packages can be statically linked to or dynamically loaded by a Go
+application binary.
 
-plugger allows a applications to discover the self-registering plugins available
-to it and to then invoke their exported plugin functions. plugger supports
-organizing plugins into multiple groups, where the plugins from one group
-typically feature functionality different from other plugin groups.
+Applications then can retrieve, for instance, a list of the exposed plugin
+functions (“symbols”) of a specific type using [Group][T]().Symbols() and then
+call all of these exposed plugin functions one after another – and without
+having to explicitly maintain a dedicated list of package functions to call in
+code. As practice shows, such lists quickly tend to get forgotten when adding
+new plugins.
 
-# Basic Usage
+Plugger v3 ensures a well-defined order of the symbols of the same type, where
+the symbols are either sorted lexicographically based on plugin names or
+optionally using ”placement hints”. This supports such use cases where some of
+the plugins might actually build upon the results from plugins that were invoked
+earlier.
 
-To work with the plugins registered in the group named "plugins" in order to
-call their exported functions, get a group object (of type [PluginGroup]) by
-calling [New], specifying the group name:
+Plugger v3 is safe for concurrent use (as opposed to v0/v2 that are not).
 
-	plugs := plugger.New("plugins")
+# Usage
 
-There's no need for callers to cache the returned plugin group object; in fact,
-it is perfectly fine to simply call [New] whenever working with the plugins of a
-group. plugger internally automatically caches the plugin group objects and
-always returns the same for a particular named group.
+Exposed plugin symbols are organized in [PluginGroup] objects, based on their
+particular type. The first step thus is to define a dedicated type for an
+exposed plugin symbol, such as a function or interface:
 
-The plugins in a group are ordered to support applications where the plugins
-need to be called in specific sequence. Plugin order defaults to lexicographical
-order, but can be selectively overridden by the plugins themselves, demanding
-specific placement. This supports more sophisticated plugin schemes, where the
-plugins allow to modularize and sequence certain application functionality.
+	type PluginFn func(string) string
 
-	for _, doit := plugs.Func("DoIt") {
-	    err := doit.(func() error)()
-	    if err != nil {
-	        break
+A good practice is to define the exported symbol types in a dedicated and
+otherwise empty package. This not only avoids import cycles but also ensures
+that always the same symbol type is used for looking up the corresponding
+[PluginGroup] object when working with symbols.
+
+The [PluginGroup] for a specific type is retrieved by calling [Group] for the
+specific type:
+
+	group := plugger.Group[PluginFn]()
+
+Calling [Group] multiple times for the same type always returns the same
+[PluginGroup] instance. There's no need for global variables referencing plugin
+group objects and using them should be avoided.
+
+Next, plugins register their exposed symbols by retrieving the symbol's group
+first and then calling the [plugger.PluginGroup.Register] receiver on the group
+object.
+
+	func init() {
+	    plugger.Group[pluginFn]().Register(MyPluginFn)
+	}
+
+	func MyPluginFn() string { return "foo" }
+
+Please note that plugger defaults to deriving the plugin name from the package
+name where [plugger.PluginGroup.Register] is called. The plugin name can also be
+explicitly specifyed by using [WithPlugin] in a registration.
+
+Finally, when an application wants to invoke the registered symbols, it needs to
+grab the group object for the specific symbol type as before and then range over
+the group's exposed [plugger.PluginGroup.Symbols].
+
+	import (
+	    // don't forget to underline-import your (static) plugins!
+	)
+
+	func main() {
+	    pluginFnGroup := plugger.Group[pluginFn]()
+	    for _, pluginFn := range pluginFnGroup.Symbols() {
+	        fmt.Println(pluginFn())
 	    }
 	}
 
-# Static Plugins
+# Dynamically loading Plugins
 
-Static plugins are permanently linked into the final application, so the
-included plugin set cannot be changed after delivering the application binary.
+Specify the build tag/constraint “plugger_dynamic” and use
+[github.com/thediveo/go-plugger/v3/dyn.Discover] to discover and load plugin
+shared objects.
 
-A typical usage pattern is to "dash"-import the static plugin packages in some
-convenient place, so the Go toolchain will link them into the final binary and
-call their init functions.
+# Upgrading from v0/v2
 
-	import (
-	    _ "example.org/plagueins/delta"
-	    _ "example.org/plagueins/omicron"
-	)
+Plugger v3 simplifies the API while at the same time introducing type-safety for
+the exposed symbols. In v3, a given [PluginGroup] always contains only symbols
+of the same particular type, but never multiple different symbol types. In
+consequence, the overhead of naming exposed symbols in order to differentiate
+them could be removed; this v1/v2 feature wasn't really used anyway.
 
-# Dynamic Plugins
-
-In contrast, dynamically linked plugins are in the form of .so shared library
-files which are separate from the application binary. Subject to the usual Go
-runtime restrictions for shared Go libraries (for instance, see Eli Bendersky's
-[Plugins in Go] blog post and spencer's [go, shared libraries, and ABIs]), the
-set of plugins for an application can be changed even after delivery. This also
-allows for simplified addition of 3rd party plugins to a plugin-aware
-application.
-
-Dynamic plugins can be easily discovered at application runtime from the
-filesystem using plugger's dyn package. It supports both flat dynamic plugin
-file layout, as well as hierarchical subdirectories, where only the plugin's
-root directory is specified.
-
-	dyn.Discover("./pugins", true)
-
-# Plugin Self-Registration
-
-Plugins of applications using the the plugger package must register themselves
-in order to become discoverable. In most cases, plugger will be able to
-automatically derive the name of a self-registering plugin as well as its group
-from a plugin's package name and its parent directory; please see below for
-details.
-
-In any case, each plugin needs to register its functions it wants to export and
-expose. This is done by calling [Register] and at least the [WithSymbol] option.
-
-	func init() {
-	    plugger.Register(plugger.WithSymbol(DoIt))
-	}
-
-	func DoIt() {
-	    // ...whatever it is you wanna do you plague-in doin'
-	}
-
-In some situations, the exported functions of the plugins might need to be run
-some specific order. For instance, before or after another particular plugin, or
-as early or even as late as possible. Plugger allows plugins to register their
-placement demands, such as after another plugin named "foo":
-
-	func init() {
-	    plugger.Register(plugger.WithPlacement(">foo"), plugger.WithSymbol(DoIt))
-	}
-
-[Plugins in Go]: https://eli.thegreenplace.net/2021/plugins-in-go/
-[go, shared libraries, and ABIs]: https://sclem.dev/posts/go-abi/
+	// v3:
+	plugger.Group[fooFn]().Register(foo)
+	// before, v0:
+	//   plugger.RegisterPlugin(&plugger.PluginSpec{
+	//      Group:   "group",
+	//      Name:    "plug1",
+	//      Symbols: []plugger.Symbol{foo},
+	//   })
+	// before, v2:
+	// plugger.Register(plugger.WithName("plug1"),
+	//     plugger.WithGroup("group"), plugger.WithSymbol(foo))
 */
 package plugger

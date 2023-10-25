@@ -1,132 +1,144 @@
 # plugger
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/thediveo/go-plugger.svg)](https://pkg.go.dev/github.com/thediveo/go-plugger/v2)
+[![Go Reference](https://pkg.go.dev/badge/github.com/thediveo/go-plugger.svg)](https://pkg.go.dev/github.com/thediveo/go-plugger/v3)
 ![GitHub](https://img.shields.io/github/license/thediveo/go-plugger)
-[![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/go-plugger/v2)](https://goreportcard.com/report/github.com/thediveo/go-plugger/v2)
+[![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/go-plugger/v3)](https://goreportcard.com/report/github.com/thediveo/go-plugger/v3)
 ![Coverage](https://img.shields.io/badge/Coverage-100.0%25-brightgreen)
 
-`plugger` is a simplistic plugin manager that works with both statically linked
-as well as dynamically linked Go plugins. It supports multiple plugin groups, as
-well as controlled plugin order within a group. Plugins then register named
-functions or named interfaces belonging to specific groups. Other application
-code finally queries the registered functions and interfaces, and then calls
-them as needed.
+`plugger/v3` is a minimalist Go plugin manager featuring type-safe handling of
+functions and interfaces (“symbols”) exposed by plugins. Type safety is checked
+at compile time, thanks to Go Generics. Plugins usually are realized as packages
+exposing certain well-defined functions or interfaces by registering these.
+Plugin packages can be statically linked to or dynamically loaded by a Go
+application binary.
+
+Applications then can retrieve, for instance, a list of the exposed plugin
+functions (“symbols”) of a _specific type_ and then call all of these exposed
+plugin functions one after another – and without having to explicitly maintain a
+dedicated list of package functions to call in code. As practice shows, such
+lists quickly tend to get forgotten when adding new plugins.
+
+`plugger/v3` ensures a well-defined order of the symbols of the same type, where
+the symbols are either sorted lexicographically based on plugin names or
+optionally using ”placement hints”. This supports such use cases where some of
+the plugins might actually build upon the results from plugins that were invoked
+earlier.
+
+Another use case is an application retrieving the exposed symbol for only a
+particular single named plugin and invoking only this particular plugin.
+
+Finally, `plugger/v3` is safe for concurrent use (as opposed to v0/v2 that are
+not).
 
 ## Installation
 
-To add `plugger/v2` to your Go module as a dependency (see below for migrating
-to v2):
+To add `plugger/v3` to your Go module as a dependency:
 
 ```bash
-go get github.com/thediveo/go-plugger/v2@latest
+go get github.com/thediveo/go-plugger/v3@latest
 ```
 
-## Examples
+## Usage
 
-The plugin registration mechanism supports registering and working with symbols
-that are either functions or interface pointers.
+Just three steps...
 
-### Registering and Calling Functions
+### Define Exposed Symbol Type
 
-See the `examples` directory for how to use plugger in a Go application for
-organizing and using static plugins (plugins that have been statically linked
-into your application). `examples/staticplugins/main.go` uses plugger to
-get all plugins in the "plugin" group and then calls some method on them.
+First, define a type for the symbol you want to expose by your plugins; this
+must be either a function or interface (but not a pure type-constraining
+interface). This type will then be used `plugger` to manage different exposed
+symbol types in separate so-called "groups".
+
+```go
+type pluginFn func() string
+```
+
+Define this type only in one place and then import it into your plugins as well
+as in the places where you need to work with the exposed symbol(s). Using a
+dedicated package just for the exposed symbol type might at first look like
+overkill but is your friend against import cycles.
+
+### Registering Exposed Symbols
+
+Second, in your plugins, register (expose) the respective `pluginFn`
+implementations by fetching the group object for your specific symbol type and
+then calling `Register` on it.
+
+```go
+import "github.com/thediveo/go-plugger/v3"
+
+func init() {
+    plugger.Group[pluginFn]().Register(MyPluginFn)
+}
+
+func MyPluginFn() string { return "foo" }
+```
+
+Please note that `plugger/v3` defaults to deriving the plugin name from the
+package name where `Register` is called.
+
+### Calling Exposed Symbols
+
+Finally, when you want to invoke the registered symbols, grab the group object
+for your specific symbol type and then range over the group's exposed symbols.
 
 ```go
 import (
-    // import your plugins
-    _ "github.com/thediveo/go-plugger/v2/examples/staticplugins/plugins/foo"
+    "github.com/thediveo/go-plugger/v3"
     // ...
+    // don't forget to underline-import your (static) plugins!
 )
 
 func main() {
-    plugs := plugger.New("plugins")
-    for _, doit := range plugs.Func("DoIt") {
-        fmt.Println(doit.(func() string)())
+    pluginFnGroup := plugger.Group[pluginFn]()
+    for _, pluginFn := range pluginFnGroup.Symbols() {
+        fmt.Println(pluginFn())
     }
 }
 ```
 
-The plugins get statically linked in by importing them, such as `plugins/foo`.
-While at first this might seem to be much overhead, the more plugins you have
-in your application, and the more groups you need them to organize into, the
-more you'll benefit from the `go-plugger` package: you only need to import
-the plugin packages, and plugger will do the rest.
+## Dynamically Loading Plugins
 
-For a more elaborate "example", please also look at `internal/staticplugin/`
-and `internal/dynamicplugin/` (these are the built-in test cases).
+Please see also `example/dynplug` for a working example.
 
-Please note that in order to use dynamically loaded plugins, the **build tag**
-`plugger_dynamic` needs to be set. The `plugger` module now defaults to **not
-including** support for dynamically loading plugins, unless explicitly requested
-by the `plugger_dynamic` build tag. The default avoids linker warnings when
-building fully static binaries without any dynamic C library references.
+1. make sure your plugin has a `main` package with an empty `main` function.
+2. build your plugin shared object using `go build -tags plugger_dynamic
+   -buildmode=plugin ...`
+   - Please don't forget to specify the `plugger_dynamic` build tag/constraint;
+     otherwise, trying to automatically discover and load plugins using
+     `dyn.Discover` will panic with a notice to enable the `plugger_dynamic`
+     build tag.
+3. in you application, call `dyn.Discover` to discover plugins in a specific
+   directory (and sub directories) and to load them.
 
-### Registering and Calling Interfaces
+## Migrating from v0/v2 to v3
 
-When registering interfaces it usually will be necessary to explicitly specify
-the interface name for registration as otherwise Go's reflection mechanism will
-cause the symbol detection to use the name of the implementing struct type
-instead. Depending on your coding style that might work, or might not.
+In `plugger/v3`, groups now correspond with exactly _one_ symbol type, whereas
+v0/v2 allowed to register multiple symbols for the same plugin in the same
+group. In v3, simply use multiple and now type-safe groups as needed, one for
+each type of exposed symbol.
 
-```go
-import (
-    "github.com/thediveo/go-plugger"
-    ".../myplugins" // import your plugin interface type, say, "I".
-)
+As one benefit, exposed symbols are now inherently nameless from the perspective
+of the plugin manager, so no more need to deal with them. And another benefit is
+that groups are also nameless too, but instead they are now (symbol) typed.
 
-type I struct {}
-var _ myplugins.I = (*I)(nil) // ensure I implements plugin.I
-
-func init() {
-    plugger.RegisterPlugin(plugger.WithName("plug1"),
-        plugger.WithGroup("group"),
-        plugger.WithNamedSymbol("I", myplugins.I(&I{}))
-}
-```
+In v3, exposed symbols are simply registered using their corresponding type-safe
+and name-less group, and with the only options available being `WithName(name)`
+and `WithPlacement(hint)`.
 
 ```go
-import (
-    "github.com/thediveo/go-plugger"
-    ".../myplugins" // import your plugin interface type, say, "I".
-    // import your plugins
-    _ ".../myplugins/foo"
-    _ "..."
-)
-
-plugs := plugger.New("plugins")
-for _, i := range plugs.Func("I") {
-    fmt.Println(i.(myplugins.I).DoIt())
-}
-```
-
-## Migrating from v0 to v2
-
-The registration is now done by calling `Register()` (formerly
-~~`RegisterPlugin`~~) and takes _option functions_ instead of the unwieldly
-`PluginSpec`.
-
-```go
-// v0:
+// v3:
+plugger.Group[fooFn]().Register(foo)
+// before, v0:
 //   plugger.RegisterPlugin(&plugger.PluginSpec{
 //      Group:   "group",
 //      Name:    "plug1",
 //      Symbols: []plugger.Symbol{foo},
 //   })
-//
-// v2:
-plugger.Register(plugger.WithName("plug1"), 
-    plugger.WithGroup("group"), plugger.WithSymbol(foo))
+// before, v2:
+// plugger.Register(plugger.WithName("plug1"), 
+//     plugger.WithGroup("group"), plugger.WithSymbol(foo))
 ```
-
-The other parts of the `plugger` API remain unchanged in v2, such as
-`New(groupname)`, et cetera.
-
-Please note that v2 now is very strict in what gets registered and `panic`s with
-details in order to clearly mark registration errors, such as
-non-function/interface symbols, duplicate names, and other invalid registration
-information.
 
 ## VSCode Tasks
 
@@ -155,14 +167,6 @@ The included `go-plugger.code-workspace` defines the following tasks:
   and pass it the local URL to open in order to show the module documentation
   rendered by `pkgsite`. This requires a detour via a task input with ID
   "_pkgsite_".
-
-## Run Unit Tests
-
-- **CLI:** (_recommended_) simply run `make test` in this repository's root
-  directory.
-
-- **VSCode:** please first build the workspace, before running tests related to
-  dynamic plugins.
 
 ## Make Targets
 

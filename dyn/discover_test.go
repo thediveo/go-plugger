@@ -21,7 +21,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/thediveo/go-plugger/v2"
+	"github.com/thediveo/go-plugger/v3"
+	"github.com/thediveo/go-plugger/v3/example/plugin"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -41,25 +42,19 @@ func (mfi mockedFileInfo) Sys() interface{}   { return nil }
 
 var _ = Describe("dynamic plugin", func() {
 
-	Describe("dynamic plugin registering", func() {
+	Describe("dynamic plugin registration", func() {
 
-		It("discovers nothing in test plugin dir itself", func() {
-			Discover("../test/dynamicplugintesting", false)
-			p := plugger.New("dynamicplugintesting").Plugins()
-			Expect(p).To(BeEmpty())
+		It("discovers nothing in example plugin dir itself", func() {
+			Discover("../example", false)
+			g := plugger.Group[plugin.DoItFn]()
+			Expect(g.Plugins()).To(BeEmpty())
 		})
 
-		It("discovers so test plugin in subdir", func() {
-			Discover("../test/dynamicplugintesting", true)
-			p := plugger.New("dynamicplugintesting").Plugins()
-			Expect(p).To(HaveLen(1))
-			Expect(p[0].Name).To(Equal("dynfoo"))
-		})
-
-		It("finds the exported named function", func() {
-			f := plugger.New("dynamicplugintesting").Func("PlugFunc")
-			Expect(f).To(HaveLen(1))
-			Expect(f[0].(func() string)()).To(Equal("dynfooplug"))
+		It("discovers and loads the .so test plugin in subdir", func() {
+			Discover("../example", true)
+			g := plugger.Group[plugin.DoItFn]()
+			Expect(g.Plugins()).To(ConsistOf("dynplug"))
+			Expect(g.Symbols()[0]()).To(Equal("dynplug dynamic plugin"))
 		})
 
 	})
@@ -68,8 +63,8 @@ var _ = Describe("dynamic plugin", func() {
 
 		It("walks an existing plugin .so", func() {
 			Expect(walkedOnSomething(
-				false, "../test/dynamicplugintesting/dynfoo/dynfooplug.so",
-				mockedFileInfo{name: "dynfooplug.so", isdir: false},
+				false, "../example/dynplug/dynplug.so",
+				mockedFileInfo{name: "dynplug.so", isdir: false},
 				nil)).To(Succeed())
 		})
 
