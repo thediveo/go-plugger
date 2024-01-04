@@ -34,6 +34,15 @@ type PluginGroup[T any] struct {
 	symbols []Symbol[T]  // (ordered) list of registered plugin symbols.
 }
 
+// GroupStash is a “backup” of a PluginGroup. It can be used especially in
+// unit tests where a PluginGroup needs to be modified to a particular known
+// configuration for a test, and the group's original configuration restored
+// after the test.
+type GroupStash[T any] struct {
+	ordered bool
+	symbols []Symbol[T]
+}
+
 // Group returns the [*PluginGroup] object for the given exposed symbol type T.
 // Calling Group multiple times for the same exposed symbol type T always
 // returns the same [PluginGroup] object.
@@ -52,7 +61,7 @@ func Group[T any]() *PluginGroup[T] {
 
 // groups maps function and interface types to their (typed) plugin groups.
 var groupsmu sync.Mutex
-var groups = map[reflect.Type]any{}
+var groups = map[reflect.Type]any{} // actually, *PluginGroup[T]
 
 // String renders a textual representation of a particular Group, showing the
 // managed symbol type as well as the plugin-exposed symbols registered in this
@@ -172,6 +181,34 @@ func (g *PluginGroup[T]) Plugins() []string {
 		plugins = append(plugins, symbol.Plugin)
 	}
 	return plugins
+}
+
+// Clears this plugin group's configuration (such as in unit tests).
+func (g *PluginGroup[T]) Clear() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.ordered = false
+	g.symbols = nil
+}
+
+// Save returns a copy of this plugin group's current plugin configuration, for
+// later restoration using the Restore method.
+func (g *PluginGroup[T]) Backup() GroupStash[T] {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return GroupStash[T]{
+		ordered: g.ordered,
+		symbols: slices.Clone(g.symbols),
+	}
+}
+
+// Restore a plugin group's former plugin configuration from a backup previously
+// created by the Backup method.
+func (g *PluginGroup[T]) Restore(s GroupStash[T]) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.ordered = s.ordered
+	g.symbols = slices.Clone(s.symbols)
 }
 
 // sort the plugins by name and optionally by reference; that is, individual

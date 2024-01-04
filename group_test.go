@@ -162,4 +162,30 @@ var _ = Describe("exposed plugin symbol groups", func() {
 			[]string{"alpha", "beta", "gamma"}),
 	)
 
+	It("backs up and restores", func() {
+		g := Group[fooFn]()
+		Expect(g).NotTo(BeNil())
+		g.Register(func() string { return "one" }, WithPlugin("one"))
+		g.Register(func() string { return "two" }, WithPlugin("two"), WithPlacement("<one"))
+
+		backup := g.Backup()
+		Expect(backup).NotTo(BeZero())
+
+		g.mu.Lock()
+		g.symbols[0].Plugin = "foobar"
+		g.mu.Unlock()
+		Expect(g.Plugins()).To(ConsistOf("foobar", "two"))
+		pluginname := func(s Symbol[fooFn]) string { return s.Plugin }
+		Expect(backup.symbols).To(ConsistOf(
+			WithTransform(pluginname, Equal("one")),
+			WithTransform(pluginname, Equal("two")),
+		), "backup should not have been modified")
+
+		g.Clear()
+		g.Register(func() string { return "three" }, WithPlugin("three"))
+		Expect(g.Plugins()).To(ConsistOf("three"))
+		g.Restore(backup)
+		Expect(g.Plugins()).To(ConsistOf("two", "one"))
+	})
+
 })

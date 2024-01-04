@@ -140,6 +140,14 @@ plugger.Group[fooFn]().Register(foo)
 //     plugger.WithGroup("group"), plugger.WithSymbol(foo))
 ```
 
+## In Unit Tests
+
+Sometimes, unit tests need a well-defined isolated plugin group configuration.
+For this, `PluginGroup[T]` objects as returned by `Group[T]()` can now be backed
+up and restored using `PluginGroup[T].Backup()` and `PluginGroup[T].Restore()`.
+Additionally, `PluginGroup[T].Clear()` resets a plugin group to its initial
+empty state.
+
 ## VSCode Tasks
 
 The included `go-plugger.code-workspace` defines the following tasks:

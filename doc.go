@@ -97,5 +97,12 @@ them could be removed; this v1/v2 feature wasn't really used anyway.
 	// before, v2:
 	// plugger.Register(plugger.WithName("plug1"),
 	//     plugger.WithGroup("group"), plugger.WithSymbol(foo))
+
+# In Unit Tests
+
+Sometimes, unit tests need a well-defined isolated plugin group configuration.
+For this, [PluginGroup] objects returned by [Group]() can now be backed up and
+restored using [PluginGroup.Backup] and [PluginGroup.Restore]. Additionally,
+[PluginGroup.Clear] resets a plugin group to its initial empty state.
 */
 package plugger
