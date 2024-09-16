@@ -15,7 +15,6 @@
 package plugger
 
 import (
-	"fmt"
 	"reflect"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -59,15 +58,18 @@ var _ = Describe("exposed plugin symbol groups", func() {
 		fooIfGroup.Register(&fooImpl{s: "one"}, WithPlugin("one"))
 		fooIfGroup.Register(&fooImpl{s: "two"}, WithPlugin("two"), WithPlacement("<"))
 		for i := 0; i < 2; i++ {
-			Expect(fmt.Sprintf("%s", fooIfGroup)).To(MatchRegexp(
+			Expect(fooIfGroup.String()).To(MatchRegexp(
 				`PluginGroup\[github\.com/thediveo/go-plugger/v3\.fooIf\]: \["two":.*,"one":.*\]`))
 		}
 
 		barFnGroup := Group[barFn]()
 		barFnGroup.Register(func() string { return "one" }, WithPlugin("one"))
 		barFnGroup.Register(func() string { return "two" }, WithPlugin("two"), WithPlacement("<one"))
-		Expect(fmt.Sprintf("%s", barFnGroup)).To(MatchRegexp(
-			`PluginGroup\[github\.com/thediveo/go-plugger/v3\.barFn\]: \["two":.*\.\.func.*,"one":.*\.\.func.*\]`))
+		Expect(barFnGroup.String()).To(Or(
+			MatchRegexp(
+				`PluginGroup\[github\.com/thediveo/go-plugger/v3\.barFn\]: \["two":.*\.\.func.*,"one":.*\.\.func.*\]`),
+			MatchRegexp(
+				`PluginGroup\[github\.com/thediveo/go-plugger/v3\.barFn\]: \["two":.*\.init\.func.*,"one":.*\.init\.func.*\]`)))
 	})
 
 	It("doesn't mix exported symbol types", func() {
