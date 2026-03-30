@@ -5,6 +5,9 @@
 		}
 	],
 	"settings": {
-		"go.buildTags": "plugger_dynamic"
+		"go.buildTags": "plugger_dynamic",
+		"markdown.styles": [
+			"./.vscode/markdown-preview.css"
+		]
 	}
 }

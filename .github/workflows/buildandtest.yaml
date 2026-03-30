@@ -7,6 +7,8 @@ on:
     branches:
       - master
       - develop
+permissions:
+  contents: read
 
 jobs:
   buildandtest:
@@ -18,13 +20,13 @@ jobs:
 
     steps:
       - name: Set up Go ${{matrix.go}}
-        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # pin@v5
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version: ${{matrix.go}}
         id: go
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # pin@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Test Go packages
         run: |

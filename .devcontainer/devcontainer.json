@@ -1,0 +1,39 @@
+{
+    "name": "go-plugger",
+    "portsAttributes": {
+        "6060": {
+            "label": "go-plugger Go package documentation",
+            "onAutoForward": "silent",
+            "protocol": "http"
+        }
+    },
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "features": {
+        "ghcr.io/thediveo/devcontainer-features/local-pkgsite:0": {},
+        "ghcr.io/thediveo/devcontainer-features/goreportcard:0": {},
+        "ghcr.io/thediveo/devcontainer-features/go-mod-upgrade:0": {},
+        "ghcr.io/thediveo/devcontainer-features/gocover:0": {
+            "num-programs": "1",    // do never run package-level tests in parallel
+            "race": true,           // enable race detector
+            "verbose": true,
+            "html": true            // generate coverage.html
+        },
+        "ghcr.io/thediveo/devcontainer-features/pin-github-action:0": {},
+        "ghcr.io/thediveo/devcontainer-features/lazygit:0": {}
+    },
+    "remoteEnv": {
+        "GOPATH": "/home/vscode/go",
+        "PATH": "/home/vscode/go/bin:/go/bin:/usr/local/go/bin:${localEnv:PATH}"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "dnut.rewrap-revived",
+                "brunnerh.insert-unicode",
+                "mhutchie.git-graph",
+                "ms-vscode.live-server",
+                "github.vscode-github-actions"
+            ]
+        }
+    }
+}
