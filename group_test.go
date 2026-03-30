@@ -42,7 +42,7 @@ var _ = Describe("exposed plugin symbol groups", func() {
 
 		It("always returns the same plugin group for a specific type", func() {
 			ch := make(chan *PluginGroup[fooFn])
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				go func() {
 					ch <- Group[fooFn]()
 				}()
@@ -57,7 +57,7 @@ var _ = Describe("exposed plugin symbol groups", func() {
 		fooIfGroup := Group[fooIf]()
 		fooIfGroup.Register(&fooImpl{s: "one"}, WithPlugin("one"))
 		fooIfGroup.Register(&fooImpl{s: "two"}, WithPlugin("two"), WithPlacement("<"))
-		for i := 0; i < 2; i++ {
+		for range 2 {
 			Expect(fooIfGroup.String()).To(MatchRegexp(
 				`PluginGroup\[github\.com/thediveo/go-plugger/v3\.fooIf\]: \["two":.*,"one":.*\]`))
 		}

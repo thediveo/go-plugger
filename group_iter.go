@@ -12,19 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build go1.23
-
 package plugger
 
 import "iter"
 
-// All returns an iterator over all registered functions/interfaces together
+// All iterates over all registered symbols (functions or interfaces) together
 // with their plugin information (name, position hint) in this plugin group.
 //
-// As plugin groups have no notion of an “index” the All iterator is a two-value
-// iterator:
-//   - registered function/interface “symbol”
-//   - plugin information, such as name and position hint.
+// As plugin groups have no notion of an “index”, the All iterator is a
+// two-value iterator where:
+//   - the “key” is registered function/interface “symbol”;
+//   - the “value” plugin information, such as name and position hint.
 //
 // Note that this iterator takes a snapshot of the currently registered plugin
 // functions and plugin data only at the time when it is called (and not when it

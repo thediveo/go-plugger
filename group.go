@@ -88,7 +88,7 @@ func (g *PluginGroup[T]) String() string {
 		if fn := runtime.FuncForPC(reflect.ValueOf(symbol.S).Pointer()); fn != nil {
 			s.WriteString(fn.Name())
 		} else {
-			s.WriteString(fmt.Sprintf("%#v", symbol.S))
+			fmt.Fprintf(&s, "%#v", symbol.S)
 		}
 	}
 	s.WriteRune(']')
