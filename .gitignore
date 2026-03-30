@@ -1,6 +1,5 @@
-coverage.txt
-coverage.out
-coverage.html
+coverage.*
+__debug_bin
+*.log
 *.so
 *.dll
-*.log
