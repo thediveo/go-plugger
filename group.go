@@ -47,8 +47,7 @@ type GroupStash[T any] struct {
 // Calling Group multiple times for the same exposed symbol type T always
 // returns the same [PluginGroup] object.
 func Group[T any]() *PluginGroup[T] {
-	var dummyCompositeT []T // https://stackoverflow.com/a/18316266
-	t := reflect.TypeOf(dummyCompositeT).Elem()
+	t := reflect.TypeFor[[]T]().Elem()
 	groupsmu.Lock()
 	defer groupsmu.Unlock()
 	group := groups[t]
@@ -72,8 +71,7 @@ func (g *PluginGroup[T]) String() string {
 
 	var s strings.Builder
 	s.WriteString("PluginGroup[")
-	var dummyCompositeT []T // https://stackoverflow.com/a/18316266
-	symbolType := reflect.TypeOf(dummyCompositeT).Elem()
+	symbolType := reflect.TypeFor[[]T]().Elem()
 	s.WriteString(symbolType.PkgPath())
 	s.WriteRune('.')
 	s.WriteString(symbolType.Name())
@@ -183,7 +181,7 @@ func (g *PluginGroup[T]) Plugins() []string {
 	return plugins
 }
 
-// Clears this plugin group's configuration (such as in unit tests).
+// Clear this plugin group's configuration (such as in unit tests).
 func (g *PluginGroup[T]) Clear() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -191,8 +189,8 @@ func (g *PluginGroup[T]) Clear() {
 	g.symbols = nil
 }
 
-// Save returns a copy of this plugin group's current plugin configuration, for
-// later restoration using the Restore method.
+// Backup returns a copy of this plugin group's current plugin configuration,
+// for later restoration using the Restore method.
 func (g *PluginGroup[T]) Backup() GroupStash[T] {
 	g.mu.RLock()
 	defer g.mu.RUnlock()

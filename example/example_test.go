@@ -22,10 +22,9 @@ import (
 	"fmt"
 
 	"github.com/thediveo/go-plugger/v3"
-	"github.com/thediveo/go-plugger/v3/example/plugin"
-
 	_ "github.com/thediveo/go-plugger/v3/example/barplug"
 	_ "github.com/thediveo/go-plugger/v3/example/fooplug"
+	"github.com/thediveo/go-plugger/v3/example/plugin"
 )
 
 // Retrieves the (ordered) list of exposed symbols of type [plugin.DoItFn] and
