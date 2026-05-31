@@ -18,11 +18,10 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
-
-	"golang.org/x/exp/slices"
 )
 
 // PluginGroup represents the exposed plugin symbols for a particular symbol
