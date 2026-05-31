@@ -38,7 +38,7 @@ func Discover(path string, recursive bool) {
 // plugin loading required; otherwise the Go linker will complain as soon as the
 // plug.Open symbol is being present (even if not used at all) and a static
 // binary is to be build.
-var pluginOpen = func(path string) error {
+var pluginOpen = func(path string) error { //nolint:unused // used
 	panic("dynamically loading plugins disabled; build with -tags plugger_dynamic")
 }
 

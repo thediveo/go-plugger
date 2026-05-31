@@ -61,8 +61,7 @@ var _ symbolSetter = (*Symbol[any])(nil)
 // implementing value's T*). The Go compiler already ensured that the value
 // satisfies the interface type T.
 func (s Symbol[T]) Validate() {
-	var dummyCompositeT []T // https://stackoverflow.com/a/18316266
-	switch reflect.TypeOf(dummyCompositeT).Elem().Kind() {
+	switch reflect.TypeFor[[]T]().Elem().Kind() {
 	case reflect.Func:
 		if reflect.ValueOf(s.S).IsNil() {
 			panic("func symbol must not be nil")

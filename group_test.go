@@ -77,7 +77,7 @@ var _ = Describe("exposed plugin symbol groups", func() {
 		Expect(fooGroup).NotTo(BeNil())
 		barGroup := Group[barFn]()
 		Expect(barGroup).NotTo(BeNil())
-		Expect(fooGroup).NotTo(BeIdenticalTo(barGroup))
+		Expect(fooGroup).NotTo(BeEquivalentTo(barGroup))
 	})
 
 	It("registers symbols and sorts them", func() {
