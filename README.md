@@ -3,7 +3,6 @@
 [![PkgGoDev](https://img.shields.io/badge/-reference-blue?logo=go&logoColor=white&labelColor=505050)](https://pkg.go.dev/github.com/thediveo/go-plugger/v3)
 [![License](https://img.shields.io/github/license/thediveo/go-plugger)](https://img.shields.io/github/license/thediveo/go-plugger)
 ![build and test](https://github.com/thediveo/go-plugger/actions/workflows/buildandtest.yaml/badge.svg?branch=master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/thediveo/go-plugger/v3)](https://goreportcard.com/report/github.com/thediveo/go-plugger/v3)
 ![Coverage](https://img.shields.io/badge/Coverage-99.3%25-brightgreen)
 
 `plugger/v3` is a minimalist Go plugin manager featuring type-safe handling of
